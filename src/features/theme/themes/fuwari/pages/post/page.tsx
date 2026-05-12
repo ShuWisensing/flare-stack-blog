@@ -6,6 +6,7 @@ import { FuwariCommentSection } from "@/features/theme/themes/fuwari/components/
 import { ContentRenderer } from "@/features/theme/themes/fuwari/components/content/content-renderer";
 import { authClient } from "@/lib/auth/auth.client";
 import { m } from "@/paraglide/messages";
+import { InlineTableOfContents } from "./components/inline-table-of-contents";
 import { PostMeta } from "./components/post-meta";
 import { PostSummary } from "./components/post-summary";
 import { RelatedPosts, RelatedPostsSkeleton } from "./components/related-posts";
@@ -84,6 +85,8 @@ export function PostPage({ post }: PostPageProps) {
 
         {/* Summary */}
         <PostSummary summary={post.summary} />
+
+        <InlineTableOfContents headers={post.toc} title={post.title} />
 
         {/* Markdown Content */}
         <div className="mb-6 prose dark:prose-invert prose-base max-w-none! fuwari-custom-md">
