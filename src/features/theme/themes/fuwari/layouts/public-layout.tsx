@@ -7,8 +7,8 @@ import { Footer } from "./footer";
 import { MobileMenu } from "./mobile-menu";
 import { Navbar } from "./navbar";
 
-const BANNER_HEIGHT_HOME = 65;
-const BANNER_HEIGHT_PAGE = 35;
+const BANNER_HEIGHT_HOME_VH = 52;
+const BANNER_HEIGHT_PAGE_VH = 32;
 const MAIN_OVERLAP_REM = 3.5;
 const NAVBAR_HEIGHT_REM = 4.5;
 
@@ -23,7 +23,12 @@ export function PublicLayout({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
   const isHomePage = location.pathname === "/";
-  const bannerHeightVh = isHomePage ? BANNER_HEIGHT_HOME : BANNER_HEIGHT_PAGE;
+  const bannerHeightVh = isHomePage
+    ? BANNER_HEIGHT_HOME_VH
+    : BANNER_HEIGHT_PAGE_VH;
+  const bannerHeight = isHomePage
+    ? `clamp(26rem, ${BANNER_HEIGHT_HOME_VH}vh, 38rem)`
+    : `clamp(18rem, ${BANNER_HEIGHT_PAGE_VH}vh, 28rem)`;
 
   return (
     <div className="relative min-h-screen bg-(--fuwari-page-bg) transition-colors">
@@ -51,7 +56,7 @@ export function PublicLayout({
       {/* Banner - full width background */}
       <div
         className="absolute left-0 right-0 top-0 z-10 overflow-hidden transition-[height] duration-300 ease-in-out"
-        style={{ height: `${bannerHeightVh}vh` }}
+        style={{ height: bannerHeight }}
       >
         <img
           src={siteConfig.theme.fuwari.homeBg}
@@ -65,7 +70,7 @@ export function PublicLayout({
       <div
         className="relative z-30 transition-[margin-top] duration-300 ease-in-out"
         style={{
-          marginTop: `calc(${bannerHeightVh}vh - ${MAIN_OVERLAP_REM}rem - ${NAVBAR_HEIGHT_REM}rem)`,
+          marginTop: `calc(${bannerHeight} - ${MAIN_OVERLAP_REM}rem - ${NAVBAR_HEIGHT_REM}rem)`,
         }}
       >
         <div

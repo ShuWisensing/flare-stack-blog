@@ -66,28 +66,28 @@ export function HomePage({
     useViewCounts(allSlugs);
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-5 md:gap-8">
       {sections.map((section, sectionIndex) => (
         <section key={section.category} className="flex flex-col gap-3">
           <div
-            className="fuwari-onload-animation flex flex-col gap-2 px-1 md:px-0"
+            className="fuwari-onload-animation fuwari-card-base px-5 py-4 md:px-6 md:py-5"
             style={{
               animationDelay: `calc(var(--fuwari-content-delay) + ${sectionIndex * delayOffset}ms)`,
             }}
           >
-            <div className="flex items-end justify-between gap-4">
-              <div>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div className="min-w-0">
                 <h2 className="text-2xl font-bold text-black/90 dark:text-white/90">
                   {section.title}
                 </h2>
-                <p className="mt-1 text-sm fuwari-text-50">
+                <p className="mt-1 max-w-2xl text-sm leading-6 fuwari-text-50">
                   {section.description}
                 </p>
               </div>
               <Link
                 to="/posts"
                 search={{ category: section.category }}
-                className="fuwari-btn-regular shrink-0 rounded-lg px-4 py-2 text-sm font-bold"
+                className="fuwari-btn-regular h-10 w-full shrink-0 rounded-lg px-4 text-sm font-bold sm:w-auto"
               >
                 查看全部
               </Link>
