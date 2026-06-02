@@ -38,3 +38,9 @@ PAGEVIEW_SALT=your-random-salt-string
 # 未认证请求限流 60 次/小时/IP，Cloudflare Workers 共享 IP 容易触发限流
 # 创建无权限的 Fine-grained token: https://github.com/settings/personal-access-tokens
 # GITHUB_TOKEN=your-github-token
+
+# --- Personal AI Hub local knowledge proxy ---
+# Local dev: http://127.0.0.1:8000; Cloudflare deploy: https://hub-api.libresensing.com
+PERSONAL_AI_HUB_API_URL=https://hub-api.libresensing.com
+# Keep this equal to E:\wiki LOCAL_HUB_API_TOKEN. Do not commit a real token.
+PERSONAL_AI_HUB_API_TOKEN=your-personal-ai-hub-token

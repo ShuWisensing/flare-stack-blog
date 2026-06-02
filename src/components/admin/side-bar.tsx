@@ -1,6 +1,8 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
+  Bot,
+  Brain,
   FileText,
   Image as ImageIcon,
   LayoutDashboard,
@@ -95,6 +97,18 @@ export function SideBar({
       path: "/admin/comments",
       icon: MessageSquare,
       label: m.admin_sidebar_comments(),
+      exact: false,
+    },
+    {
+      path: "/admin/personal-ai-hub" as keyof FileRoutesByTo,
+      icon: Brain,
+      label: "Personal AI Hub",
+      exact: false,
+    },
+    {
+      path: "/admin/personal-ai-hub/agent-chat" as keyof FileRoutesByTo,
+      icon: Bot,
+      label: "Agent Chat",
       exact: false,
     },
     {

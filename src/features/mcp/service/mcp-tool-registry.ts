@@ -3,6 +3,7 @@ import { mcpAnalyticsTools } from "../features/analytics";
 import { mcpCommentsTools } from "../features/comments";
 import { mcpFriendLinksTools } from "../features/friend-links";
 import { mcpMediaTools } from "../features/media";
+import { mcpPersonalAiHubTools } from "../features/personal-ai-hub";
 import { mcpPostsTools } from "../features/posts";
 import { mcpSearchTools } from "../features/search";
 import { mcpTagsTools } from "../features/tags";
@@ -15,6 +16,7 @@ const MCP_TOOLS: McpToolDefinition[] = [
   ...mcpCommentsTools,
   ...mcpFriendLinksTools,
   ...mcpMediaTools,
+  ...mcpPersonalAiHubTools,
   ...mcpPostsTools,
   ...mcpSearchTools,
   ...mcpTagsTools,

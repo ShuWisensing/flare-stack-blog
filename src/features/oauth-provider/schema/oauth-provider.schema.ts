@@ -9,6 +9,9 @@ export const OAuthScopeRequestSchema = z.object({
     .array(z.enum(OAUTH_BLOG_SCOPE_GROUPS["friend-links"]))
     .optional(),
   media: z.array(z.enum(OAUTH_BLOG_SCOPE_GROUPS.media)).optional(),
+  "personal-ai-hub": z
+    .array(z.enum(OAUTH_BLOG_SCOPE_GROUPS["personal-ai-hub"]))
+    .optional(),
   posts: z.array(z.enum(OAUTH_BLOG_SCOPE_GROUPS.posts)).optional(),
 });
 

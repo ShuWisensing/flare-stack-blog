@@ -52,6 +52,8 @@ declare global {
     IMPORT_WORKFLOW: Workflow<ImportWorkflowParams>;
     OAUTH_PROVIDER?: OAuthHelpers;
     QUEUE: Queue<QueueMessage>;
+    PERSONAL_AI_HUB_API_URL?: string;
+    PERSONAL_AI_HUB_API_TOKEN?: string;
   }
 
   type DB = DBType;

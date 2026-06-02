@@ -19,6 +19,7 @@ export const OAUTH_BLOG_SCOPE_GROUPS = {
   media: ["read", "write"],
   // settings: ["read", "write"], // 暂时用不到
   "friend-links": ["read", "write"],
+  "personal-ai-hub": ["read"],
 } as const;
 
 export type OAuthStandardScope = (typeof OAUTH_STANDARD_SCOPE_VALUES)[number];
