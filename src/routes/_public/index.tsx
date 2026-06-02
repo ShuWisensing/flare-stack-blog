@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import theme from "@theme";
 import { siteDomainQuery } from "@/features/config/queries";
 import {
+  categoryPostsQuery,
   pinnedPostsQuery,
   popularPostsQuery,
   recentPostsQuery,
@@ -13,12 +14,17 @@ const { recentPostsLimit, popularPostsLimit } = theme.config.home;
 
 export const Route = createFileRoute("/_public/")({
   loader: async ({ context }) => {
-    const [, domain] = await Promise.all([
+    const domainPromise = context.queryClient.ensureQueryData(siteDomainQuery);
+    await Promise.all([
       context.queryClient.ensureQueryData(recentPostsQuery(recentPostsLimit)),
-      context.queryClient.ensureQueryData(siteDomainQuery),
+      context.queryClient.ensureQueryData(categoryPostsQuery("tracking", 3)),
+      context.queryClient.ensureQueryData(categoryPostsQuery("paper", 3)),
+      context.queryClient.ensureQueryData(categoryPostsQuery("practice", 3)),
+      domainPromise,
       context.queryClient.ensureQueryData(pinnedPostsQuery),
       context.queryClient.ensureQueryData(popularPostsQuery(popularPostsLimit)),
     ]);
+    const domain = await domainPromise;
 
     return {
       canonicalHref: buildCanonicalUrl(domain, "/"),
@@ -33,6 +39,13 @@ export const Route = createFileRoute("/_public/")({
 
 function HomeRoute() {
   const { data: posts } = useSuspenseQuery(recentPostsQuery(recentPostsLimit));
+  const { data: trackingPosts } = useSuspenseQuery(
+    categoryPostsQuery("tracking", 3),
+  );
+  const { data: paperPosts } = useSuspenseQuery(categoryPostsQuery("paper", 3));
+  const { data: practicePosts } = useSuspenseQuery(
+    categoryPostsQuery("practice", 3),
+  );
   const { data: pinnedPosts } = useSuspenseQuery(pinnedPostsQuery);
   const { data: popularPosts } = useSuspenseQuery(
     popularPostsQuery(popularPostsLimit),
@@ -43,6 +56,9 @@ function HomeRoute() {
       posts={posts}
       pinnedPosts={pinnedPosts}
       popularPosts={popularPosts}
+      trackingPosts={trackingPosts}
+      paperPosts={paperPosts}
+      practicePosts={practicePosts}
     />
   );
 }

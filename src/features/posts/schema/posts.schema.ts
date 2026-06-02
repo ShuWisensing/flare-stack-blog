@@ -5,6 +5,7 @@ import {
 } from "drizzle-zod";
 import { z } from "zod";
 import { TagSelectSchema } from "@/features/tags/tags.schema";
+import { POST_CATEGORY_IDS } from "@/features/posts/utils/category";
 import type { Post, PostStatus, Tag } from "@/lib/db/schema";
 import { POST_STATUSES, PostsTable } from "@/lib/db/schema";
 import { NullableJsonContentSchema } from "./json-content.schema";
@@ -53,6 +54,7 @@ export const GetPostsCursorInputSchema = z.object({
   cursor: z.number().optional(),
   limit: z.number().optional(),
   tagName: z.string().optional(),
+  category: z.enum(POST_CATEGORY_IDS).optional(),
   excludePinned: z.boolean().optional(),
 });
 
@@ -127,8 +129,13 @@ export type PostItem = z.infer<typeof PostItemSchema>;
 export type PostWithToc = z.infer<typeof PostWithTocSchema>;
 
 export const POSTS_CACHE_KEYS = {
-  list: (version: string, limit: number, cursor: number, tagName: string) =>
-    ["posts", "list", version, limit, cursor, tagName] as const,
+  list: (
+    version: string,
+    limit: number,
+    cursor: number,
+    tagName: string,
+    category: string,
+  ) => ["posts", "list", version, limit, cursor, tagName, category] as const,
   detail: (version: string, slug: string) => [version, "post", slug] as const,
   related: (slug: string, limit?: number) =>
     ["posts", "related-ids", slug, limit] as const,

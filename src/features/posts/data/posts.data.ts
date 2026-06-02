@@ -10,6 +10,7 @@ import {
   ne,
   or,
   sql,
+  type SQL,
 } from "drizzle-orm";
 import type { SortDirection, SortField } from "@/features/posts/data/helper";
 import {
@@ -17,11 +18,43 @@ import {
   buildPostWhereClause,
 } from "@/features/posts/data/helper";
 import type { PostListItem } from "@/features/posts/schema/posts.schema";
+import type { PostCategoryId } from "@/features/posts/utils/category";
+import {
+  PAPER_TAG_NAME,
+  TRACKING_POST_TITLES,
+} from "@/features/posts/utils/category";
 import type { PostStatus, Tag } from "@/lib/db/schema";
 import { PostsTable, PostTagsTable, TagsTable } from "@/lib/db/schema";
 
 const DEFAULT_PAGE_SIZE = 12;
 const DEFAULT_SITEMAP_BATCH_SIZE = 500;
+
+function buildPostCategoryCondition(
+  category: PostCategoryId | undefined,
+): SQL | undefined {
+  if (!category) return undefined;
+
+  const isTrackingPost = inArray(PostsTable.title, TRACKING_POST_TITLES);
+  const hasPaperTag = sql`exists (
+    select 1
+    from post_tags pt
+    inner join tags t on t.id = pt.tag_id
+    where pt.post_id = ${PostsTable.id}
+      and t.name = ${PAPER_TAG_NAME}
+  )`;
+
+  switch (category) {
+    case "tracking":
+      return isTrackingPost;
+    case "paper":
+      return and(sql`not (${isTrackingPost})`, hasPaperTag);
+    case "practice":
+      return and(sql`not (${isTrackingPost})`, sql`not (${hasPaperTag})`);
+    default:
+      category satisfies never;
+      return undefined;
+  }
+}
 
 export type SitemapPostRow = {
   id: number;
@@ -107,6 +140,7 @@ export async function getPostsCursor(
     limit?: number;
     publicOnly?: boolean;
     tagName?: string;
+    category?: PostCategoryId;
     excludePinned?: boolean;
   } = {},
 ): Promise<{
@@ -118,6 +152,7 @@ export async function getPostsCursor(
     limit = DEFAULT_PAGE_SIZE,
     publicOnly,
     tagName,
+    category,
     excludePinned,
   } = options;
 
@@ -154,6 +189,11 @@ export async function getPostsCursor(
 
   if (tagName) {
     conditions.push(eq(TagsTable.name, tagName));
+  }
+
+  const categoryCondition = buildPostCategoryCondition(category);
+  if (categoryCondition) {
+    conditions.push(categoryCondition);
   }
 
   if (excludePinned) {

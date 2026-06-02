@@ -2,90 +2,130 @@ import { Link } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { useViewCounts } from "@/features/pageview/queries";
 import type { PostItem } from "@/features/posts/schema/posts.schema";
+import type { PostCategoryId } from "@/features/posts/utils/category";
 import type { HomePageProps } from "@/features/theme/contract/pages";
-import { m } from "@/paraglide/messages";
 import { PostCard } from "../../components/post-card";
 
-interface MergedPost {
-  post: PostItem;
-  pinned: boolean;
-  popular: boolean;
+interface HomeSection {
+  title: string;
+  description: string;
+  category: PostCategoryId;
+  posts: Array<PostItem>;
 }
 
-export function HomePage({ posts, pinnedPosts, popularPosts }: HomePageProps) {
+export function HomePage({
+  pinnedPosts,
+  popularPosts,
+  trackingPosts,
+  paperPosts,
+  practicePosts,
+}: HomePageProps) {
   const delayOffset = 50;
 
-  const mergedPosts = useMemo(() => {
-    const seen = new Set<string>();
-    const result: MergedPost[] = [];
-    const popularSlugs = new Set((popularPosts ?? []).map((p) => p.slug));
-
-    // 1. Pinned first
-    for (const post of pinnedPosts ?? []) {
-      if (seen.has(post.slug)) continue;
-      seen.add(post.slug);
-      result.push({ post, pinned: true, popular: popularSlugs.has(post.slug) });
-    }
-
-    // 2. Popular next (excluding already added)
-    for (const post of popularPosts ?? []) {
-      if (seen.has(post.slug)) continue;
-      seen.add(post.slug);
-      result.push({ post, pinned: false, popular: true });
-    }
-
-    // 3. Recent fills the rest
-    for (const post of posts) {
-      if (seen.has(post.slug)) continue;
-      seen.add(post.slug);
-      result.push({ post, pinned: false, popular: false });
-    }
-
-    return result;
-  }, [posts, pinnedPosts, popularPosts]);
-
-  const allSlugs = useMemo(
-    () => mergedPosts.map((m) => m.post.slug),
-    [mergedPosts],
+  const popularSlugs = useMemo(
+    () => new Set((popularPosts ?? []).map((post) => post.slug)),
+    [popularPosts],
   );
+  const pinnedSlugs = useMemo(
+    () => new Set((pinnedPosts ?? []).map((post) => post.slug)),
+    [pinnedPosts],
+  );
+
+  const sections: Array<HomeSection> = useMemo(
+    () => [
+      {
+        title: "长期追踪",
+        description: "持续更新 AI 技术新闻与无线感知前沿。",
+        category: "tracking",
+        posts: trackingPosts,
+      },
+      {
+        title: "论文阅读",
+        description: "围绕模型、方法和研究趋势整理阅读笔记。",
+        category: "paper",
+        posts: paperPosts,
+      },
+      {
+        title: "技术实践",
+        description: "记录工程经验、工具链实践和项目复盘。",
+        category: "practice",
+        posts: practicePosts,
+      },
+    ],
+    [paperPosts, practicePosts, trackingPosts],
+  );
+
+  const allSlugs = useMemo(() => {
+    return [
+      ...new Set(
+        sections.flatMap((section) => section.posts.map((post) => post.slug)),
+      ),
+    ];
+  }, [sections]);
   const { data: viewCounts, isPending: isPendingViewCounts } =
     useViewCounts(allSlugs);
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col rounded-(--fuwari-radius-large) bg-(--fuwari-card-bg) py-1 md:py-0 md:bg-transparent md:gap-4">
-        {mergedPosts.map(({ post, pinned, popular }, i) => (
+    <div className="flex flex-col gap-8">
+      {sections.map((section, sectionIndex) => (
+        <section key={section.category} className="flex flex-col gap-3">
           <div
-            key={post.slug}
-            className="fuwari-onload-animation"
+            className="fuwari-onload-animation flex flex-col gap-2 px-1 md:px-0"
             style={{
-              animationDelay: `calc(var(--fuwari-content-delay) + ${i * delayOffset}ms)`,
+              animationDelay: `calc(var(--fuwari-content-delay) + ${sectionIndex * delayOffset}ms)`,
             }}
           >
-            <PostCard
-              post={post}
-              pinned={pinned}
-              popular={!pinned && popular}
-              views={viewCounts?.[post.slug]}
-              isLoadingViews={isPendingViewCounts}
-            />
-            <div className="border-t border-dashed mx-6 border-black/10 dark:border-white/15 last:border-t-0 md:hidden" />
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-bold text-black/90 dark:text-white/90">
+                  {section.title}
+                </h2>
+                <p className="mt-1 text-sm fuwari-text-50">
+                  {section.description}
+                </p>
+              </div>
+              <Link
+                to="/posts"
+                search={{ category: section.category }}
+                className="fuwari-btn-regular shrink-0 rounded-lg px-4 py-2 text-sm font-bold"
+              >
+                查看全部
+              </Link>
+            </div>
           </div>
-        ))}
-        <div
-          className="fuwari-onload-animation"
-          style={{
-            animationDelay: `calc(var(--fuwari-content-delay) + ${mergedPosts.length * delayOffset}ms)`,
-          }}
-        >
-          <Link
-            to="/posts"
-            className="fuwari-btn-regular mx-6 rounded-lg h-10 px-6 mt-4 flex items-center justify-center mb-4 md:mb-0 md:mx-auto"
-          >
-            {m.home_view_all_posts()}
-          </Link>
-        </div>
-      </div>
+
+          {section.posts.length > 0 ? (
+            <div className="flex flex-col rounded-(--fuwari-radius-large) bg-(--fuwari-card-bg) py-1 md:py-0 md:bg-transparent md:gap-4">
+              {section.posts.map((post, postIndex) => (
+                <div
+                  key={post.slug}
+                  className="fuwari-onload-animation"
+                  style={{
+                    animationDelay: `calc(var(--fuwari-content-delay) + ${
+                      (sectionIndex + postIndex + 1) * delayOffset
+                    }ms)`,
+                  }}
+                >
+                  <PostCard
+                    post={post}
+                    pinned={pinnedSlugs.has(post.slug)}
+                    popular={
+                      !pinnedSlugs.has(post.slug) && popularSlugs.has(post.slug)
+                    }
+                    views={viewCounts?.[post.slug]}
+                    isLoadingViews={isPendingViewCounts}
+                  />
+                  <div className="border-t border-dashed mx-6 border-black/10 dark:border-white/15 last:border-t-0 md:hidden" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="fuwari-card-base px-6 py-8 text-sm fuwari-text-50">
+              暂无{section.title}文章
+            </div>
+          )}
+        </section>
+      ))}
     </div>
   );
 }
