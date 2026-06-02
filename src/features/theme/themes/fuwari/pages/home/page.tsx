@@ -66,7 +66,7 @@ export function HomePage({
     useViewCounts(allSlugs);
 
   return (
-    <div className="flex flex-col gap-5 md:gap-8">
+    <div className="mt-8 flex flex-col gap-5 md:mt-10 md:gap-8 lg:mt-12">
       {sections.map((section, sectionIndex) => (
         <section key={section.category} className="flex flex-col gap-3">
           <div
