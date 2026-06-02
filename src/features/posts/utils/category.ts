@@ -36,6 +36,7 @@ export const POST_CATEGORY_OPTIONS: Array<PostCategoryOption> = [
 ];
 
 export const TRACKING_POST_TITLES = ["AI 技术新闻", "无线感知前沿"];
+export const TRACKING_TAG_NAME = "长期追踪";
 export const PAPER_TAG_NAME = "论文阅读";
 
 export function isPostCategoryId(
@@ -45,7 +46,10 @@ export function isPostCategoryId(
 }
 
 export function getPostCategory(post: PostItem): PostCategoryId {
-  if (TRACKING_POST_TITLES.includes(post.title)) {
+  if (
+    TRACKING_POST_TITLES.includes(post.title) ||
+    post.tags?.some((tag) => tag.name === TRACKING_TAG_NAME)
+  ) {
     return "tracking";
   }
 

@@ -21,6 +21,7 @@ import type { PostListItem } from "@/features/posts/schema/posts.schema";
 import type { PostCategoryId } from "@/features/posts/utils/category";
 import {
   PAPER_TAG_NAME,
+  TRACKING_TAG_NAME,
   TRACKING_POST_TITLES,
 } from "@/features/posts/utils/category";
 import type { PostStatus, Tag } from "@/lib/db/schema";
@@ -34,7 +35,17 @@ function buildPostCategoryCondition(
 ): SQL | undefined {
   if (!category) return undefined;
 
-  const isTrackingPost = inArray(PostsTable.title, TRACKING_POST_TITLES);
+  const hasTrackingTag = sql`exists (
+    select 1
+    from post_tags pt
+    inner join tags t on t.id = pt.tag_id
+    where pt.post_id = ${PostsTable.id}
+      and t.name = ${TRACKING_TAG_NAME}
+  )`;
+  const isTrackingPost = or(
+    inArray(PostsTable.title, TRACKING_POST_TITLES),
+    hasTrackingTag,
+  ) as SQL;
   const hasPaperTag = sql`exists (
     select 1
     from post_tags pt

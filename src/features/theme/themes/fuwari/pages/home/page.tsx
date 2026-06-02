@@ -3,14 +3,39 @@ import { useMemo } from "react";
 import { useViewCounts } from "@/features/pageview/queries";
 import type { PostItem } from "@/features/posts/schema/posts.schema";
 import type { PostCategoryId } from "@/features/posts/utils/category";
+import { getPostCategory } from "@/features/posts/utils/category";
 import type { HomePageProps } from "@/features/theme/contract/pages";
 import { PostCard } from "../../components/post-card";
+
+const HOME_SECTION_POST_TARGET = 3;
 
 interface HomeSection {
   title: string;
   description: string;
   category: PostCategoryId;
   posts: Array<PostItem>;
+}
+
+function buildSectionPosts({
+  category,
+  posts,
+  pinnedPosts,
+}: {
+  category: PostCategoryId;
+  posts: Array<PostItem>;
+  pinnedPosts: Array<PostItem>;
+}) {
+  const categoryPinnedPosts = pinnedPosts.filter(
+    (post) => getPostCategory(post) === category,
+  );
+  const pinnedSlugs = new Set(categoryPinnedPosts.map((post) => post.slug));
+  const regularPosts = posts.filter((post) => !pinnedSlugs.has(post.slug));
+  const regularLimit = Math.max(
+    0,
+    HOME_SECTION_POST_TARGET - categoryPinnedPosts.length,
+  );
+
+  return [...categoryPinnedPosts, ...regularPosts.slice(0, regularLimit)];
 }
 
 export function HomePage({
@@ -32,27 +57,43 @@ export function HomePage({
   );
 
   const sections: Array<HomeSection> = useMemo(
-    () => [
-      {
-        title: "长期追踪",
-        description: "持续更新 AI 技术新闻与无线感知前沿。",
-        category: "tracking",
-        posts: trackingPosts,
-      },
-      {
-        title: "论文阅读",
-        description: "围绕模型、方法和研究趋势整理阅读笔记。",
-        category: "paper",
-        posts: paperPosts,
-      },
-      {
-        title: "技术实践",
-        description: "记录工程经验、工具链实践和项目复盘。",
-        category: "practice",
-        posts: practicePosts,
-      },
-    ],
-    [paperPosts, practicePosts, trackingPosts],
+    () => {
+      const pinned = pinnedPosts ?? [];
+
+      return [
+        {
+          title: "长期追踪",
+          description: "持续更新 AI 技术新闻与无线感知前沿。",
+          category: "tracking",
+          posts: buildSectionPosts({
+            category: "tracking",
+            posts: trackingPosts,
+            pinnedPosts: pinned,
+          }),
+        },
+        {
+          title: "论文阅读",
+          description: "围绕模型、方法和研究趋势整理阅读笔记。",
+          category: "paper",
+          posts: buildSectionPosts({
+            category: "paper",
+            posts: paperPosts,
+            pinnedPosts: pinned,
+          }),
+        },
+        {
+          title: "技术实践",
+          description: "记录工程经验、工具链实践和项目复盘。",
+          category: "practice",
+          posts: buildSectionPosts({
+            category: "practice",
+            posts: practicePosts,
+            pinnedPosts: pinned,
+          }),
+        },
+      ];
+    },
+    [paperPosts, pinnedPosts, practicePosts, trackingPosts],
   );
 
   const allSlugs = useMemo(() => {
