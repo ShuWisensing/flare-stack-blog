@@ -86,6 +86,8 @@ jobs:
           echo "VITE_TURNSTILE_SITE_KEY=${{ vars.VITE_TURNSTILE_SITE_KEY }}" >> $GITHUB_ENV
           echo "THEME=${{ vars.THEME }}" >> $GITHUB_ENV
           echo "TURNSTILE_SECRET_KEY=${{ secrets.TURNSTILE_SECRET_KEY }}" >> $GITHUB_ENV
+          echo "PERSONAL_AI_HUB_API_URL=${{ secrets.PERSONAL_AI_HUB_API_URL }}" >> $GITHUB_ENV
+          echo "PERSONAL_AI_HUB_API_TOKEN=${{ secrets.PERSONAL_AI_HUB_API_TOKEN }}" >> $GITHUB_ENV
 
       - name: Inject Resource IDs
         run: |
@@ -112,7 +114,9 @@ jobs:
             "UMAMI_SRC": "$UMAMI_SRC",
             "PAGEVIEW_SALT": "$PAGEVIEW_SALT",
             "TURNSTILE_SECRET_KEY": "$TURNSTILE_SECRET_KEY",
-            "GITHUB_TOKEN": "$GITHUB_TOKEN"
+            "GITHUB_TOKEN": "$GITHUB_TOKEN",
+            "PERSONAL_AI_HUB_API_URL": "$PERSONAL_AI_HUB_API_URL",
+            "PERSONAL_AI_HUB_API_TOKEN": "$PERSONAL_AI_HUB_API_TOKEN"
           }
           EOF
 
