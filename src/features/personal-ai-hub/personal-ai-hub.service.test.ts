@@ -10,7 +10,7 @@ import {
 } from "@/features/personal-ai-hub/service/personal-ai-hub.service";
 
 describe("Personal AI Hub service", () => {
-  it("requires explicit local Hub API URL and token", () => {
+  it("requires explicit Hub API URL and token", () => {
     expect(() => getHubApiConfig({})).toThrow("PERSONAL_AI_HUB_API_URL");
     expect(() =>
       getHubApiConfig({ PERSONAL_AI_HUB_API_URL: "https://hub-api.libresensing.com" }),
@@ -70,7 +70,7 @@ describe("Personal AI Hub service", () => {
     );
   });
 
-  it("surfaces local Hub offline errors without leaking token", async () => {
+  it("surfaces Hub offline errors without leaking token", async () => {
     const fetchMock = vi.fn(async () => new Response("internal detail", { status: 503 }));
 
     await expect(() =>
@@ -89,7 +89,7 @@ describe("Personal AI Hub service", () => {
           topK: 8,
         },
       ),
-    ).rejects.toThrow("本地 Personal AI Hub 服务不可用");
+    ).rejects.toThrow("Personal AI Hub 服务不可用");
   });
 
   it("proxies Agent Chat messages to the local Hub agent API", async () => {

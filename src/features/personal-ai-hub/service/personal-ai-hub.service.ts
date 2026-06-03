@@ -32,7 +32,7 @@ type HubRequestContext = {
 export function getHubApiConfig(env: HubEnv) {
   const apiUrl = env.PERSONAL_AI_HUB_API_URL?.trim().replace(/\/+$/, "");
   if (!apiUrl) {
-    throw new Error("缺少环境变量 PERSONAL_AI_HUB_API_URL，无法连接本地 Personal AI Hub。");
+    throw new Error("缺少环境变量 PERSONAL_AI_HUB_API_URL，无法连接 Personal AI Hub。");
   }
 
   const token = env.PERSONAL_AI_HUB_API_TOKEN?.trim();
@@ -139,7 +139,7 @@ async function hubFetch(context: HubRequestContext, path: string, init: RequestI
   });
 
   if (!response.ok) {
-    throw new Error("本地 Personal AI Hub 服务不可用，请确认本地电脑、FastAPI 和 Cloudflare Tunnel 已启动。");
+    throw new Error("Personal AI Hub 服务不可用，请确认本地 FastAPI、Cloudflare Tunnel 已启动，且 PERSONAL_AI_HUB_API_TOKEN 与 LOCAL_HUB_API_TOKEN 一致。");
   }
 
   return response.json();

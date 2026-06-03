@@ -30,12 +30,12 @@ import { Route as AuthForgotPasswordRouteImport } from './routes/_auth/forgot-pa
 import { Route as AdminPostsRouteRouteImport } from './routes/admin/posts/route'
 import { Route as AdminTagsIndexRouteImport } from './routes/admin/tags/index'
 import { Route as AdminSettingsIndexRouteImport } from './routes/admin/settings/index'
-import { Route as AdminPersonalAiHubAgentChatRouteImport } from './routes/admin/personal-ai-hub/agent-chat'
-import { Route as AdminPersonalAiHubIndexRouteImport } from './routes/admin/personal-ai-hub/index'
 import { Route as AdminPostsIndexRouteImport } from './routes/admin/posts/index'
+import { Route as AdminPersonalAiHubIndexRouteImport } from './routes/admin/personal-ai-hub/index'
 import { Route as AdminMediaIndexRouteImport } from './routes/admin/media/index'
 import { Route as AdminFriendLinksIndexRouteImport } from './routes/admin/friend-links/index'
 import { Route as AdminCommentsIndexRouteImport } from './routes/admin/comments/index'
+import { Route as AdminPersonalAiHubAgentChatRouteImport } from './routes/admin/personal-ai-hub/agent-chat'
 import { Route as PublicPostSlugRouteImport } from './routes/_public/post/$slug'
 import { Route as AdminPostsEditIdRouteImport } from './routes/admin/posts/edit.$id'
 
@@ -141,20 +141,15 @@ const AdminSettingsIndexRoute = AdminSettingsIndexRouteImport.update({
   path: '/settings/',
   getParentRoute: () => AdminRouteRoute,
 } as any)
-const AdminPersonalAiHubIndexRoute = AdminPersonalAiHubIndexRouteImport.update({
-  id: '/personal-ai-hub/',
-  path: '/personal-ai-hub/',
-  getParentRoute: () => AdminRouteRoute,
-} as any)
-const AdminPersonalAiHubAgentChatRoute = AdminPersonalAiHubAgentChatRouteImport.update({
-  id: '/personal-ai-hub/agent-chat',
-  path: '/personal-ai-hub/agent-chat',
-  getParentRoute: () => AdminRouteRoute,
-} as any)
 const AdminPostsIndexRoute = AdminPostsIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AdminPostsRouteRoute,
+} as any)
+const AdminPersonalAiHubIndexRoute = AdminPersonalAiHubIndexRouteImport.update({
+  id: '/personal-ai-hub/',
+  path: '/personal-ai-hub/',
+  getParentRoute: () => AdminRouteRoute,
 } as any)
 const AdminMediaIndexRoute = AdminMediaIndexRouteImport.update({
   id: '/media/',
@@ -171,6 +166,12 @@ const AdminCommentsIndexRoute = AdminCommentsIndexRouteImport.update({
   path: '/comments/',
   getParentRoute: () => AdminRouteRoute,
 } as any)
+const AdminPersonalAiHubAgentChatRoute =
+  AdminPersonalAiHubAgentChatRouteImport.update({
+    id: '/personal-ai-hub/agent-chat',
+    path: '/personal-ai-hub/agent-chat',
+    getParentRoute: () => AdminRouteRoute,
+  } as any)
 const PublicPostSlugRoute = PublicPostSlugRouteImport.update({
   id: '/post/$slug',
   path: '/post/$slug',
@@ -200,10 +201,10 @@ export interface FileRoutesByFullPath {
   '/': typeof PublicIndexRoute
   '/admin/': typeof AdminIndexRoute
   '/post/$slug': typeof PublicPostSlugRoute
+  '/admin/personal-ai-hub/agent-chat': typeof AdminPersonalAiHubAgentChatRoute
   '/admin/comments': typeof AdminCommentsIndexRoute
   '/admin/friend-links': typeof AdminFriendLinksIndexRoute
   '/admin/media': typeof AdminMediaIndexRoute
-  '/admin/personal-ai-hub/agent-chat': typeof AdminPersonalAiHubAgentChatRoute
   '/admin/personal-ai-hub': typeof AdminPersonalAiHubIndexRoute
   '/admin/posts/': typeof AdminPostsIndexRoute
   '/admin/settings': typeof AdminSettingsIndexRoute
@@ -226,10 +227,10 @@ export interface FileRoutesByTo {
   '/': typeof PublicIndexRoute
   '/admin': typeof AdminIndexRoute
   '/post/$slug': typeof PublicPostSlugRoute
+  '/admin/personal-ai-hub/agent-chat': typeof AdminPersonalAiHubAgentChatRoute
   '/admin/comments': typeof AdminCommentsIndexRoute
   '/admin/friend-links': typeof AdminFriendLinksIndexRoute
   '/admin/media': typeof AdminMediaIndexRoute
-  '/admin/personal-ai-hub/agent-chat': typeof AdminPersonalAiHubAgentChatRoute
   '/admin/personal-ai-hub': typeof AdminPersonalAiHubIndexRoute
   '/admin/posts': typeof AdminPostsIndexRoute
   '/admin/settings': typeof AdminSettingsIndexRoute
@@ -258,10 +259,10 @@ export interface FileRoutesById {
   '/_public/': typeof PublicIndexRoute
   '/admin/': typeof AdminIndexRoute
   '/_public/post/$slug': typeof PublicPostSlugRoute
+  '/admin/personal-ai-hub/agent-chat': typeof AdminPersonalAiHubAgentChatRoute
   '/admin/comments/': typeof AdminCommentsIndexRoute
   '/admin/friend-links/': typeof AdminFriendLinksIndexRoute
   '/admin/media/': typeof AdminMediaIndexRoute
-  '/admin/personal-ai-hub/agent-chat': typeof AdminPersonalAiHubAgentChatRoute
   '/admin/personal-ai-hub/': typeof AdminPersonalAiHubIndexRoute
   '/admin/posts/': typeof AdminPostsIndexRoute
   '/admin/settings/': typeof AdminSettingsIndexRoute
@@ -288,10 +289,10 @@ export interface FileRouteTypes {
     | '/'
     | '/admin/'
     | '/post/$slug'
+    | '/admin/personal-ai-hub/agent-chat'
     | '/admin/comments'
     | '/admin/friend-links'
     | '/admin/media'
-    | '/admin/personal-ai-hub/agent-chat'
     | '/admin/personal-ai-hub'
     | '/admin/posts/'
     | '/admin/settings'
@@ -314,10 +315,10 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/post/$slug'
+    | '/admin/personal-ai-hub/agent-chat'
     | '/admin/comments'
     | '/admin/friend-links'
     | '/admin/media'
-    | '/admin/personal-ai-hub/agent-chat'
     | '/admin/personal-ai-hub'
     | '/admin/posts'
     | '/admin/settings'
@@ -345,10 +346,10 @@ export interface FileRouteTypes {
     | '/_public/'
     | '/admin/'
     | '/_public/post/$slug'
+    | '/admin/personal-ai-hub/agent-chat'
     | '/admin/comments/'
     | '/admin/friend-links/'
     | '/admin/media/'
-    | '/admin/personal-ai-hub/agent-chat'
     | '/admin/personal-ai-hub/'
     | '/admin/posts/'
     | '/admin/settings/'
@@ -513,26 +514,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSettingsIndexRouteImport
       parentRoute: typeof AdminRouteRoute
     }
-    '/admin/personal-ai-hub/': {
-      id: '/admin/personal-ai-hub/'
-      path: '/personal-ai-hub'
-      fullPath: '/admin/personal-ai-hub'
-      preLoaderRoute: typeof AdminPersonalAiHubIndexRouteImport
-      parentRoute: typeof AdminRouteRoute
-    }
-    '/admin/personal-ai-hub/agent-chat': {
-      id: '/admin/personal-ai-hub/agent-chat'
-      path: '/personal-ai-hub/agent-chat'
-      fullPath: '/admin/personal-ai-hub/agent-chat'
-      preLoaderRoute: typeof AdminPersonalAiHubAgentChatRouteImport
-      parentRoute: typeof AdminRouteRoute
-    }
     '/admin/posts/': {
       id: '/admin/posts/'
       path: '/'
       fullPath: '/admin/posts/'
       preLoaderRoute: typeof AdminPostsIndexRouteImport
       parentRoute: typeof AdminPostsRouteRoute
+    }
+    '/admin/personal-ai-hub/': {
+      id: '/admin/personal-ai-hub/'
+      path: '/personal-ai-hub'
+      fullPath: '/admin/personal-ai-hub'
+      preLoaderRoute: typeof AdminPersonalAiHubIndexRouteImport
+      parentRoute: typeof AdminRouteRoute
     }
     '/admin/media/': {
       id: '/admin/media/'
@@ -553,6 +547,13 @@ declare module '@tanstack/react-router' {
       path: '/comments'
       fullPath: '/admin/comments'
       preLoaderRoute: typeof AdminCommentsIndexRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
+    '/admin/personal-ai-hub/agent-chat': {
+      id: '/admin/personal-ai-hub/agent-chat'
+      path: '/personal-ai-hub/agent-chat'
+      fullPath: '/admin/personal-ai-hub/agent-chat'
+      preLoaderRoute: typeof AdminPersonalAiHubAgentChatRouteImport
       parentRoute: typeof AdminRouteRoute
     }
     '/_public/post/$slug': {
@@ -645,10 +646,10 @@ const AdminPostsRouteRouteWithChildren = AdminPostsRouteRoute._addFileChildren(
 interface AdminRouteRouteChildren {
   AdminPostsRouteRoute: typeof AdminPostsRouteRouteWithChildren
   AdminIndexRoute: typeof AdminIndexRoute
+  AdminPersonalAiHubAgentChatRoute: typeof AdminPersonalAiHubAgentChatRoute
   AdminCommentsIndexRoute: typeof AdminCommentsIndexRoute
   AdminFriendLinksIndexRoute: typeof AdminFriendLinksIndexRoute
   AdminMediaIndexRoute: typeof AdminMediaIndexRoute
-  AdminPersonalAiHubAgentChatRoute: typeof AdminPersonalAiHubAgentChatRoute
   AdminPersonalAiHubIndexRoute: typeof AdminPersonalAiHubIndexRoute
   AdminSettingsIndexRoute: typeof AdminSettingsIndexRoute
   AdminTagsIndexRoute: typeof AdminTagsIndexRoute
@@ -657,10 +658,10 @@ interface AdminRouteRouteChildren {
 const AdminRouteRouteChildren: AdminRouteRouteChildren = {
   AdminPostsRouteRoute: AdminPostsRouteRouteWithChildren,
   AdminIndexRoute: AdminIndexRoute,
+  AdminPersonalAiHubAgentChatRoute: AdminPersonalAiHubAgentChatRoute,
   AdminCommentsIndexRoute: AdminCommentsIndexRoute,
   AdminFriendLinksIndexRoute: AdminFriendLinksIndexRoute,
   AdminMediaIndexRoute: AdminMediaIndexRoute,
-  AdminPersonalAiHubAgentChatRoute: AdminPersonalAiHubAgentChatRoute,
   AdminPersonalAiHubIndexRoute: AdminPersonalAiHubIndexRoute,
   AdminSettingsIndexRoute: AdminSettingsIndexRoute,
   AdminTagsIndexRoute: AdminTagsIndexRoute,

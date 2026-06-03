@@ -179,6 +179,10 @@ function formatCommand(args: Array<string>) {
   return ["bunx", "wrangler", ...args].join(" ");
 }
 
+export function normalizeCommandOutput(output: string | null | undefined) {
+  return (output ?? "").trim();
+}
+
 function runWrangler(args: Array<string>) {
   console.log(`$ ${formatCommand(args)}`);
 
@@ -188,8 +192,8 @@ function runWrangler(args: Array<string>) {
     encoding: "utf8",
   });
 
-  const stdout = result.stdout.trim();
-  const stderr = result.stderr.trim();
+  const stdout = normalizeCommandOutput(result.stdout);
+  const stderr = normalizeCommandOutput(result.stderr);
 
   if (stdout) {
     console.log(stdout);

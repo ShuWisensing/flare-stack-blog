@@ -8,6 +8,7 @@ import { z } from "zod";
 import { Turnstile, useTurnstile } from "@/components/common/turnstile";
 import { useLoginForm, useSocialLogin } from "@/features/auth/hooks";
 import { m } from "@/paraglide/messages";
+import { createLoginSearchParams } from "./-login-url";
 
 export const Route = createFileRoute("/_auth/login")({
   validateSearch: z.object({
@@ -34,9 +35,7 @@ function RouteComponent() {
     turnstileProps,
   } = useTurnstile("login");
 
-  const currentSearchParams = new URLSearchParams(
-    new URL(location.href, window.location.origin).search,
-  );
+  const currentSearchParams = createLoginSearchParams(location.href);
   const isOAuthAuthorizationRequest =
     !!currentSearchParams.get("client_id") &&
     !!currentSearchParams.get("response_type");

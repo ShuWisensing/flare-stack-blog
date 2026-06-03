@@ -1,18 +1,22 @@
 const REDIRECT_URL_ALLOW_LIST: Array<string> = [];
+const SERVER_SAFE_ORIGIN = "http://localhost";
 
 export function normalizeRedirectUrl(
   redirectTo: string | undefined,
   fallback: string,
+  origin = typeof window === "undefined"
+    ? SERVER_SAFE_ORIGIN
+    : window.location.origin,
 ) {
-  const safeFallback = `${window.location.origin}${fallback}`;
+  const safeFallback = `${origin}${fallback}`;
 
   if (!redirectTo) {
     return safeFallback;
   }
 
   try {
-    const normalizedUrl = new URL(redirectTo, window.location.origin);
-    const isSameOrigin = normalizedUrl.origin === window.location.origin;
+    const normalizedUrl = new URL(redirectTo, origin);
+    const isSameOrigin = normalizedUrl.origin === origin;
     const isAllowedExternalHostname = REDIRECT_URL_ALLOW_LIST.includes(
       normalizedUrl.hostname,
     );
