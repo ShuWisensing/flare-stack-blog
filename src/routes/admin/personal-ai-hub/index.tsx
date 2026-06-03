@@ -7,7 +7,10 @@ import {
   getPersonalAiHubStatusFn,
   queryPersonalAiHubKnowledgeBaseFn,
 } from "@/features/personal-ai-hub/api/personal-ai-hub.admin.api";
-import type { HubQueryResponse, HubStatusResponse } from "@/features/personal-ai-hub/schema/personal-ai-hub.schema";
+import type {
+  HubQueryResponse,
+  HubStatusResponse,
+} from "@/features/personal-ai-hub/schema/personal-ai-hub.schema";
 
 export const Route = createFileRoute("/admin/personal-ai-hub/")({
   component: PersonalAiHubPage,
@@ -23,13 +26,13 @@ function PersonalAiHubPage() {
   const [result, setResult] = useState<HubQueryResponse | null>(null);
 
   const statusMutation = useMutation({
-    mutationFn: () => getPersonalAiHubStatusFn(),
+    mutationFn: async () => (await getPersonalAiHubStatusFn()) as HubStatusResponse,
     onSuccess: setStatus,
   });
 
   const queryMutation = useMutation({
-    mutationFn: () =>
-      queryPersonalAiHubKnowledgeBaseFn({
+    mutationFn: async () =>
+      (await queryPersonalAiHubKnowledgeBaseFn({
         data: {
           question,
           answerMode: "local",
@@ -40,7 +43,7 @@ function PersonalAiHubPage() {
           rerankTopK: 8,
           bm25Weight: 0.45,
         },
-      }),
+      })) as HubQueryResponse,
     onSuccess: setResult,
   });
 

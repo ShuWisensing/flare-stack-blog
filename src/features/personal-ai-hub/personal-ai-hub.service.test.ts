@@ -134,9 +134,13 @@ describe("Personal AI Hub service", () => {
   });
 
   it("proxies Agent Chat session endpoints", async () => {
-    const fetchMock = vi.fn(async (url: string) => {
-      if (url.endsWith("/agent/sessions")) {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/agent/sessions") && init?.method === "GET") {
         return new Response(JSON.stringify({ items: [{ id: "ses_1" }] }), { status: 200 });
+      }
+      if (url.endsWith("/agent/sessions") && init?.method === "POST") {
+        return new Response(JSON.stringify({ session: { id: "ses_2" } }), { status: 200 });
       }
       if (url.endsWith("/agent/status")) {
         return new Response(JSON.stringify({ opencode: { busy: false } }), { status: 200 });
@@ -144,7 +148,7 @@ describe("Personal AI Hub service", () => {
       if (url.endsWith("/agent/sessions/ses_1/messages")) {
         return new Response(JSON.stringify({ items: [{ id: "msg_1" }] }), { status: 200 });
       }
-      return new Response(JSON.stringify({ session: { id: "ses_2" } }), { status: 200 });
+      throw new Error(`unexpected URL: ${url}`);
     });
     const context = {
       env: {

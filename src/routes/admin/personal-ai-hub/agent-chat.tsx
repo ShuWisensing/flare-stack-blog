@@ -10,6 +10,12 @@ import {
   sendPersonalAiHubAgentChatMessageFn,
 } from "@/features/personal-ai-hub/api/personal-ai-hub.admin.api";
 import type { AgentChatResponse } from "@/features/personal-ai-hub/schema/personal-ai-hub.schema";
+import type {
+  AgentMessagesResponse,
+  AgentSessionResponse,
+  AgentSessionsResponse,
+  AgentStatusResponse,
+} from "@/features/personal-ai-hub/schema/personal-ai-hub.schema";
 
 export const Route = createFileRoute("/admin/personal-ai-hub/agent-chat")({
   component: AgentChatPage,
@@ -30,26 +36,30 @@ function AgentChatPage() {
 
   const sessionsQuery = useQuery({
     queryKey: ["personal-ai-hub", "agent-sessions"],
-    queryFn: () => listPersonalAiHubAgentSessionsFn(),
+    queryFn: async () =>
+      (await listPersonalAiHubAgentSessionsFn()) as AgentSessionsResponse,
   });
 
   const statusQuery = useQuery({
     queryKey: ["personal-ai-hub", "agent-status"],
-    queryFn: () => getPersonalAiHubAgentStatusFn(),
+    queryFn: async () =>
+      (await getPersonalAiHubAgentStatusFn()) as AgentStatusResponse,
   });
 
   const messagesQuery = useQuery({
     enabled: Boolean(sessionId.trim()),
     queryKey: ["personal-ai-hub", "agent-messages", sessionId],
-    queryFn: () =>
-      listPersonalAiHubAgentMessagesFn({ data: { sessionId } }),
+    queryFn: async () =>
+      (await listPersonalAiHubAgentMessagesFn({
+        data: { sessionId },
+      })) as AgentMessagesResponse,
   });
 
   const createSessionMutation = useMutation({
-    mutationFn: () =>
-      createPersonalAiHubAgentSessionFn({
+    mutationFn: async () =>
+      (await createPersonalAiHubAgentSessionFn({
         data: { title: sessionTitle },
-      }),
+      })) as AgentSessionResponse,
     onSuccess: (response) => {
       const id = String(response.session.id ?? "");
       setSessionId(id);
@@ -58,8 +68,8 @@ function AgentChatPage() {
   });
 
   const mutation = useMutation({
-    mutationFn: () =>
-      sendPersonalAiHubAgentChatMessageFn({
+    mutationFn: async () =>
+      (await sendPersonalAiHubAgentChatMessageFn({
         data: {
           bm25Weight: 0.45,
           model,
@@ -68,7 +78,7 @@ function AgentChatPage() {
           sessionId,
           topK: 8,
         },
-      }),
+      })) as AgentChatResponse,
     onSuccess: (response) => {
       setResult(response);
       messagesQuery.refetch();

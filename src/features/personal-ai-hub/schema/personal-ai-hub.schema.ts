@@ -17,21 +17,21 @@ export const HubQueryInputSchema = z.object({
 
 export const HubQueryResponseSchema = z.object({
   answer: z.string(),
-  citations: z.array(z.record(z.string(), z.unknown())),
-  recall_items: z.array(z.record(z.string(), z.unknown())),
-  timings: z.record(z.string(), z.unknown()),
-  execution: z.record(z.string(), z.unknown()),
+  citations: z.array(z.record(z.string(), z.any())),
+  recall_items: z.array(z.record(z.string(), z.any())),
+  timings: z.record(z.string(), z.any()),
+  execution: z.record(z.string(), z.any()),
 });
 
 export const HubStatusResponseSchema = z.object({
   status: z.string(),
   project_root: z.string().optional(),
   counts: z.record(z.string(), z.number()).optional(),
-  indexes: z.record(z.string(), z.unknown()).optional(),
+  indexes: z.record(z.string(), z.any()).optional(),
 });
 
 export const HubSourcesResponseSchema = z.object({
-  items: z.array(z.record(z.string(), z.unknown())),
+  items: z.array(z.record(z.string(), z.any())),
 });
 
 export const AgentChatInputSchema = z.object({
@@ -46,12 +46,12 @@ export const AgentChatInputSchema = z.object({
 });
 
 export const AgentChatResponseSchema = z.object({
-  opencode_result: z.record(z.string(), z.unknown()),
-  citations: z.array(z.record(z.string(), z.unknown())),
-  recall_items: z.array(z.record(z.string(), z.unknown())),
-  timings: z.record(z.string(), z.unknown()),
-  execution: z.record(z.string(), z.unknown()),
-  run_record: z.record(z.string(), z.unknown()).optional(),
+  opencode_result: z.record(z.string(), z.any()),
+  citations: z.array(z.record(z.string(), z.any())),
+  recall_items: z.array(z.record(z.string(), z.any())),
+  timings: z.record(z.string(), z.any()),
+  execution: z.record(z.string(), z.any()),
+  run_record: z.record(z.string(), z.any()).optional(),
 });
 
 export const AgentSessionCreateInputSchema = z.object({
@@ -63,29 +63,29 @@ export const AgentSessionMessagesInputSchema = z.object({
 });
 
 export const AgentSessionsResponseSchema = z.object({
-  items: z.array(z.record(z.string(), z.unknown())),
+  items: z.array(z.record(z.string(), z.any())),
 });
 
 export const AgentSessionResponseSchema = z.object({
-  session: z.record(z.string(), z.unknown()),
+  session: z.record(z.string(), z.any()),
 });
 
 export const AgentMessagesResponseSchema = z.object({
-  items: z.array(z.record(z.string(), z.unknown())),
+  items: z.array(z.record(z.string(), z.any())),
 });
 
 export const AgentStatusResponseSchema = z.object({
-  opencode: z.record(z.string(), z.unknown()),
+  opencode: z.record(z.string(), z.any()),
 });
 
-export type HubQueryInput = z.infer<typeof HubQueryInputSchema>;
+export type HubQueryInput = z.input<typeof HubQueryInputSchema>;
 export type HubQueryResponse = z.infer<typeof HubQueryResponseSchema>;
 export type HubStatusResponse = z.infer<typeof HubStatusResponseSchema>;
 export type HubSourcesResponse = z.infer<typeof HubSourcesResponseSchema>;
-export type AgentChatInput = z.infer<typeof AgentChatInputSchema>;
+export type AgentChatInput = z.input<typeof AgentChatInputSchema>;
 export type AgentChatResponse = z.infer<typeof AgentChatResponseSchema>;
-export type AgentSessionCreateInput = z.infer<typeof AgentSessionCreateInputSchema>;
-export type AgentSessionMessagesInput = z.infer<typeof AgentSessionMessagesInputSchema>;
+export type AgentSessionCreateInput = z.input<typeof AgentSessionCreateInputSchema>;
+export type AgentSessionMessagesInput = z.input<typeof AgentSessionMessagesInputSchema>;
 export type AgentSessionsResponse = z.infer<typeof AgentSessionsResponseSchema>;
 export type AgentSessionResponse = z.infer<typeof AgentSessionResponseSchema>;
 export type AgentMessagesResponse = z.infer<typeof AgentMessagesResponseSchema>;

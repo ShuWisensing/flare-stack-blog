@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { McpToolContext } from "../../service/mcp.types";
 import { mcpPersonalAiHubTools } from "./index";
 import { wikiQueryTool } from "./tools/wiki-query.tool";
 import { wikiSourcesListTool } from "./tools/wiki-sources-list.tool";
@@ -32,9 +33,12 @@ describe("personal ai hub mcp tools", () => {
     const result = await wikiQueryTool.handler(
       {
         question: "Fresnel Zone",
+        answerMode: "llm_rag",
         llmModel: "deepseek-v4-flash",
         retrievalMode: "hybrid",
         topK: 8,
+        rerankMode: "off",
+        rerankTopK: 8,
       },
       {
         env: {
@@ -42,7 +46,7 @@ describe("personal ai hub mcp tools", () => {
           PERSONAL_AI_HUB_API_URL: "https://hub-api.libresensing.com/",
         },
         fetch: fetchMock,
-      } as any,
+      } as unknown as McpToolContext,
     );
 
     expect(fetchMock).toHaveBeenCalledWith(
@@ -54,7 +58,8 @@ describe("personal ai hub mcp tools", () => {
         }),
       }),
     );
-    expect(result.structuredContent).toEqual(
+    expect(result.isError).not.toBe(true);
+    expect("structuredContent" in result ? result.structuredContent : null).toEqual(
       expect.objectContaining({ answer: "matched answer" }),
     );
   });
@@ -74,12 +79,14 @@ describe("personal ai hub mcp tools", () => {
         PERSONAL_AI_HUB_API_URL: "https://hub-api.libresensing.com",
       },
       fetch: fetchMock,
-    } as any;
+    } as unknown as McpToolContext;
 
     const status = await wikiStatusTool.handler(context);
     const sources = await wikiSourcesListTool.handler(context);
 
-    expect(status.structuredContent).toEqual({ status: "ready" });
-    expect(sources.structuredContent).toEqual({ items: [{ source_id: "src_1" }] });
+    expect(status.isError).not.toBe(true);
+    expect(sources.isError).not.toBe(true);
+    expect("structuredContent" in status ? status.structuredContent : null).toEqual({ status: "ready" });
+    expect("structuredContent" in sources ? sources.structuredContent : null).toEqual({ items: [{ source_id: "src_1" }] });
   });
 });
