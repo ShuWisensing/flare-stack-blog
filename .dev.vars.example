@@ -40,7 +40,7 @@ PAGEVIEW_SALT=your-random-salt-string
 # GITHUB_TOKEN=your-github-token
 
 # --- Personal AI Hub knowledge proxy ---
-# Cloudflare Tunnel forwards this domain to the local E:\wiki FastAPI service.
+# Cloudflare Tunnel forwards this domain to the local E:\wiki FastAPI service running on this PC.
 PERSONAL_AI_HUB_API_URL=https://hub-api.libresensing.com
 # Keep this equal to E:\wiki LOCAL_HUB_API_TOKEN. Do not commit a real token.
 PERSONAL_AI_HUB_API_TOKEN=your-personal-ai-hub-token
