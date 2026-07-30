@@ -13,6 +13,7 @@ import type {
   PostPageProps,
   PostsPageProps,
   ProfilePageProps,
+  ProjectsPageProps,
   RegisterPageProps,
   ResetPasswordPageProps,
   SearchPageProps,
@@ -44,6 +45,9 @@ export interface ThemeComponents {
   PostsPage: React.ComponentType<PostsPageProps>;
   /** 文章列表页骨架屏 */
   PostsPageSkeleton: React.ComponentType;
+
+  /** 开源项目页组件 */
+  ProjectsPage: React.ComponentType<ProjectsPageProps>;
 
   /** 文章详情页组件 */
   PostPage: React.ComponentType<PostPageProps>;

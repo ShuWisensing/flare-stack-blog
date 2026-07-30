@@ -14,6 +14,7 @@ export type * from "./pages/login";
 export type * from "./pages/post";
 export type * from "./pages/posts";
 export type * from "./pages/profile";
+export type * from "./pages/projects";
 export type * from "./pages/register";
 export type * from "./pages/reset-password";
 export type * from "./pages/search";

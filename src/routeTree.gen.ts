@@ -20,6 +20,7 @@ import { Route as UserSubmitFriendLinkRouteImport } from './routes/_user/submit-
 import { Route as UserProfileRouteImport } from './routes/_user/profile'
 import { Route as PublicUnsubscribeRouteImport } from './routes/_public/unsubscribe'
 import { Route as PublicSearchRouteImport } from './routes/_public/search'
+import { Route as PublicProjectsRouteImport } from './routes/_public/projects'
 import { Route as PublicPostsRouteImport } from './routes/_public/posts'
 import { Route as PublicFriendLinksRouteImport } from './routes/_public/friend-links'
 import { Route as AuthVerifyEmailRouteImport } from './routes/_auth/verify-email'
@@ -89,6 +90,11 @@ const PublicUnsubscribeRoute = PublicUnsubscribeRouteImport.update({
 const PublicSearchRoute = PublicSearchRouteImport.update({
   id: '/search',
   path: '/search',
+  getParentRoute: () => PublicRouteRoute,
+} as any)
+const PublicProjectsRoute = PublicProjectsRouteImport.update({
+  id: '/projects',
+  path: '/projects',
   getParentRoute: () => PublicRouteRoute,
 } as any)
 const PublicPostsRoute = PublicPostsRouteImport.update({
@@ -193,6 +199,7 @@ export interface FileRoutesByFullPath {
   '/verify-email': typeof AuthVerifyEmailRoute
   '/friend-links': typeof PublicFriendLinksRoute
   '/posts': typeof PublicPostsRoute
+  '/projects': typeof PublicProjectsRoute
   '/search': typeof PublicSearchRoute
   '/unsubscribe': typeof PublicUnsubscribeRoute
   '/profile': typeof UserProfileRoute
@@ -219,6 +226,7 @@ export interface FileRoutesByTo {
   '/verify-email': typeof AuthVerifyEmailRoute
   '/friend-links': typeof PublicFriendLinksRoute
   '/posts': typeof PublicPostsRoute
+  '/projects': typeof PublicProjectsRoute
   '/search': typeof PublicSearchRoute
   '/unsubscribe': typeof PublicUnsubscribeRoute
   '/profile': typeof UserProfileRoute
@@ -251,6 +259,7 @@ export interface FileRoutesById {
   '/_auth/verify-email': typeof AuthVerifyEmailRoute
   '/_public/friend-links': typeof PublicFriendLinksRoute
   '/_public/posts': typeof PublicPostsRoute
+  '/_public/projects': typeof PublicProjectsRoute
   '/_public/search': typeof PublicSearchRoute
   '/_public/unsubscribe': typeof PublicUnsubscribeRoute
   '/_user/profile': typeof UserProfileRoute
@@ -281,6 +290,7 @@ export interface FileRouteTypes {
     | '/verify-email'
     | '/friend-links'
     | '/posts'
+    | '/projects'
     | '/search'
     | '/unsubscribe'
     | '/profile'
@@ -307,6 +317,7 @@ export interface FileRouteTypes {
     | '/verify-email'
     | '/friend-links'
     | '/posts'
+    | '/projects'
     | '/search'
     | '/unsubscribe'
     | '/profile'
@@ -338,6 +349,7 @@ export interface FileRouteTypes {
     | '/_auth/verify-email'
     | '/_public/friend-links'
     | '/_public/posts'
+    | '/_public/projects'
     | '/_public/search'
     | '/_public/unsubscribe'
     | '/_user/profile'
@@ -442,6 +454,13 @@ declare module '@tanstack/react-router' {
       path: '/search'
       fullPath: '/search'
       preLoaderRoute: typeof PublicSearchRouteImport
+      parentRoute: typeof PublicRouteRoute
+    }
+    '/_public/projects': {
+      id: '/_public/projects'
+      path: '/projects'
+      fullPath: '/projects'
+      preLoaderRoute: typeof PublicProjectsRouteImport
       parentRoute: typeof PublicRouteRoute
     }
     '/_public/posts': {
@@ -596,6 +615,7 @@ const AuthRouteRouteWithChildren = AuthRouteRoute._addFileChildren(
 interface PublicRouteRouteChildren {
   PublicFriendLinksRoute: typeof PublicFriendLinksRoute
   PublicPostsRoute: typeof PublicPostsRoute
+  PublicProjectsRoute: typeof PublicProjectsRoute
   PublicSearchRoute: typeof PublicSearchRoute
   PublicUnsubscribeRoute: typeof PublicUnsubscribeRoute
   PublicIndexRoute: typeof PublicIndexRoute
@@ -605,6 +625,7 @@ interface PublicRouteRouteChildren {
 const PublicRouteRouteChildren: PublicRouteRouteChildren = {
   PublicFriendLinksRoute: PublicFriendLinksRoute,
   PublicPostsRoute: PublicPostsRoute,
+  PublicProjectsRoute: PublicProjectsRoute,
   PublicSearchRoute: PublicSearchRoute,
   PublicUnsubscribeRoute: PublicUnsubscribeRoute,
   PublicIndexRoute: PublicIndexRoute,

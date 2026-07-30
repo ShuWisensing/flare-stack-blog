@@ -2,6 +2,7 @@
   "$schema": "https://inlang.com/schema/inlang-message-format",
   "nav_home": "主页",
   "nav_posts": "文章",
+  "nav_projects": "项目",
   "nav_friend_links": "友链",
   "nav_search": "搜索",
   "nav_login": "登录",
@@ -31,6 +32,14 @@
   "posts_end": "到底啦",
   "posts_tags_filter": "// 分类_筛选",
   "posts_all": "全部",
+  "projects_kicker": "Open Source · GitHub",
+  "projects_title": "开源项目",
+  "projects_description": "把想法做成可以被使用、被复现，也可以继续生长的工具。",
+  "projects_meta_description": "浏览 smx 精选并持续维护的 GitHub 开源项目。",
+  "projects_view_github": "查看 GitHub",
+  "projects_visio_description": "通过可见的 Microsoft Visio 自动化流程，绘制并交付可继续编辑的科研示意图。",
+  "projects_enterprise_knowledge_base_description": "面向论文主题知识库的 RAG 问答、混合检索、调试与量化评估系统。",
+  "projects_chatbi_description": "使用自然语言完成 A 股行情查询、统计分析、预测和技术指标检测。",
   "posts_count": [
     {
       "declarations": ["input count", "local formattedCountZh = count: number"],

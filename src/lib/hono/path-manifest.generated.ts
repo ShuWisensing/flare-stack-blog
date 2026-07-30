@@ -12,6 +12,7 @@ export const ROUTE_REGEXPS: Array<RegExp> = [
   /^\/verify-email\/?$/,
   /^\/friend-links\/?$/,
   /^\/posts\/?$/,
+  /^\/projects\/?$/,
   /^\/search\/?$/,
   /^\/unsubscribe\/?$/,
   /^\/profile\/?$/,

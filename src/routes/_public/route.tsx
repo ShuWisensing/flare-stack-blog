@@ -4,6 +4,7 @@ import theme from "@theme";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { AUTH_KEYS } from "@/features/auth/queries";
+import { getPublicNavOptions } from "@/features/theme/public-navigation";
 import { getThemePreloadImages } from "@/features/theme/site-config.helpers";
 import { authClient } from "@/lib/auth/auth.client";
 import { getLogoutAuthErrorMessage } from "@/lib/auth/auth-errors";
@@ -33,15 +34,7 @@ function PublicLayout() {
     authClient.useSession();
   const queryClient = useQueryClient();
 
-  const navOptions = [
-    { label: m.nav_home(), to: "/" as const, id: "home" },
-    { label: m.nav_posts(), to: "/posts" as const, id: "posts" },
-    {
-      label: m.nav_friend_links(),
-      to: "/friend-links" as const,
-      id: "friend-links",
-    },
-  ];
+  const navOptions = getPublicNavOptions();
 
   const logout = async () => {
     const { error } = await authClient.signOut();
