@@ -40,6 +40,9 @@
   "projects_visio_description": "A visible Microsoft Visio automation workflow for drawing and delivering fully editable scientific illustrations.",
   "projects_enterprise_knowledge_base_description": "A RAG question-answering, hybrid retrieval, debugging, and evaluation system for research paper knowledge bases.",
   "projects_chatbi_description": "Use natural language to query, analyze, forecast, and inspect technical indicators for China A-share market data.",
+  "projects_academic_paper_plugin_description": "An evidence-gated academic paper workflow for Codex and Claude Code, from structured inputs to audited LaTeX delivery.",
+  "projects_intelligent_tender_description": "A smart workspace for radio tendering that parses bid documents, identifies lots, builds outlines, generates sections, and exports Word files.",
+  "projects_enterprise_recommendation_description": "An enterprise recommendation system for investment promotion, using LangGraph for requirement clarification, candidate retrieval, verification, and evidence-based ranking.",
   "posts_count": [
     {
       "declarations": ["input count", "local formattedCountEn = count: number"],

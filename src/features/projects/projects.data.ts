@@ -35,5 +35,29 @@ export function getProjects(): Project[] {
       tags: ["Python", "Agent", "SQLite"],
       monogram: "BI",
     },
+    {
+      id: "academic-paper-plugin",
+      name: "Academic Paper Plugin",
+      description: m.projects_academic_paper_plugin_description(),
+      url: "https://github.com/TZ-mx/Academic-Paper-Plugin",
+      tags: ["Codex", "Claude Code", "LaTeX"],
+      monogram: "AP",
+    },
+    {
+      id: "intelligent-tender-document-generation",
+      name: "Intelligent Tender Document Generation",
+      description: m.projects_intelligent_tender_description(),
+      url: "https://github.com/TZ-mx/Intelligent-tender-document-generation",
+      tags: ["React", "Electron", "DOCX"],
+      monogram: "TD",
+    },
+    {
+      id: "enterprise-intelligent-recommendation",
+      name: "Enterprise Intelligent Recommendation",
+      description: m.projects_enterprise_recommendation_description(),
+      url: "https://github.com/TZ-mx/Enterprise-Intelligent-Recommendation",
+      tags: ["Python", "LangGraph", "FastAPI"],
+      monogram: "ER",
+    },
   ];
 }

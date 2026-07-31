@@ -8,7 +8,7 @@ import { getProjects } from "./projects.data";
 import { getProjectsSeo } from "./projects.seo";
 
 describe("projects", () => {
-  it("仅返回当前选定的三个开源项目", () => {
+  it("仅返回当前选定的六个开源项目", () => {
     const projects = getProjects();
 
     expect(
@@ -36,6 +36,24 @@ describe("projects", () => {
         name: "ChatBI-nanobot",
         url: "https://github.com/TZ-mx/ChatBI-nanobot",
         tags: ["Python", "Agent", "SQLite"],
+      },
+      {
+        id: "academic-paper-plugin",
+        name: "Academic Paper Plugin",
+        url: "https://github.com/TZ-mx/Academic-Paper-Plugin",
+        tags: ["Codex", "Claude Code", "LaTeX"],
+      },
+      {
+        id: "intelligent-tender-document-generation",
+        name: "Intelligent Tender Document Generation",
+        url: "https://github.com/TZ-mx/Intelligent-tender-document-generation",
+        tags: ["React", "Electron", "DOCX"],
+      },
+      {
+        id: "enterprise-intelligent-recommendation",
+        name: "Enterprise Intelligent Recommendation",
+        url: "https://github.com/TZ-mx/Enterprise-Intelligent-Recommendation",
+        tags: ["Python", "LangGraph", "FastAPI"],
       },
     ]);
     expect(projects.every((project) => project.description.length > 0)).toBe(

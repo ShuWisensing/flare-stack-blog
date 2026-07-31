@@ -40,6 +40,9 @@
   "projects_visio_description": "通过可见的 Microsoft Visio 自动化流程，绘制并交付可继续编辑的科研示意图。",
   "projects_enterprise_knowledge_base_description": "面向论文主题知识库的 RAG 问答、混合检索、调试与量化评估系统。",
   "projects_chatbi_description": "使用自然语言完成 A 股行情查询、统计分析、预测和技术指标检测。",
+  "projects_academic_paper_plugin_description": "面向 Codex 与 Claude Code 的证据门禁式学术论文工作流，从材料规范化推进到可审计的 LaTeX 交付。",
+  "projects_intelligent_tender_description": "面向无线电投标场景的智能工作台，支持招标文件解析、标段识别、目录构建、分章生成与 Word 导出。",
+  "projects_enterprise_recommendation_description": "面向产业招商场景的企业智能推荐系统，通过 LangGraph 完成需求澄清、候选召回、企业核验与证据化排序。",
   "posts_count": [
     {
       "declarations": ["input count", "local formattedCountZh = count: number"],
