@@ -8,7 +8,7 @@ import { getProjects } from "./projects.data";
 import { getProjectsSeo } from "./projects.seo";
 
 describe("projects", () => {
-  it("仅返回当前选定的六个开源项目", () => {
+  it("仅返回当前选定的七个开源项目", () => {
     const projects = getProjects();
 
     expect(
@@ -54,6 +54,12 @@ describe("projects", () => {
         name: "Enterprise Intelligent Recommendation",
         url: "https://github.com/TZ-mx/Enterprise-Intelligent-Recommendation",
         tags: ["Python", "LangGraph", "FastAPI"],
+      },
+      {
+        id: "llm-distillation-finetuning-cases",
+        name: "LLM Fine-Tuning Cases",
+        url: "https://github.com/TZ-mx/llm-distillation-finetuning-cases",
+        tags: ["Python", "Qwen", "Fine-Tuning"],
       },
     ]);
     expect(projects.every((project) => project.description.length > 0)).toBe(

@@ -43,6 +43,7 @@
   "projects_academic_paper_plugin_description": "面向 Codex 与 Claude Code 的证据门禁式学术论文工作流，从材料规范化推进到可审计的 LaTeX 交付。",
   "projects_intelligent_tender_description": "面向无线电投标场景的智能工作台，支持招标文件解析、标段识别、目录构建、分章生成与 Word 导出。",
   "projects_enterprise_recommendation_description": "面向产业招商场景的企业智能推荐系统，通过 LangGraph 完成需求澄清、候选召回、企业核验与证据化排序。",
+  "projects_llm_finetuning_cases_description": "整理 Qwen2.5-VL LoRA、Alpaca 指令 SFT 与 GSM8K GRPO 推理训练案例，并提供模型对比评估脚本。",
   "posts_count": [
     {
       "declarations": ["input count", "local formattedCountZh = count: number"],

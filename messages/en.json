@@ -43,6 +43,7 @@
   "projects_academic_paper_plugin_description": "An evidence-gated academic paper workflow for Codex and Claude Code, from structured inputs to audited LaTeX delivery.",
   "projects_intelligent_tender_description": "A smart workspace for radio tendering that parses bid documents, identifies lots, builds outlines, generates sections, and exports Word files.",
   "projects_enterprise_recommendation_description": "An enterprise recommendation system for investment promotion, using LangGraph for requirement clarification, candidate retrieval, verification, and evidence-based ranking.",
+  "projects_llm_finetuning_cases_description": "Hands-on Qwen training cases covering Qwen2.5-VL LoRA, Alpaca instruction SFT, GSM8K GRPO reasoning, and model comparison evaluation.",
   "posts_count": [
     {
       "declarations": ["input count", "local formattedCountEn = count: number"],

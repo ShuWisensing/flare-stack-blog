@@ -59,5 +59,13 @@ export function getProjects(): Project[] {
       tags: ["Python", "LangGraph", "FastAPI"],
       monogram: "ER",
     },
+    {
+      id: "llm-distillation-finetuning-cases",
+      name: "LLM Fine-Tuning Cases",
+      description: m.projects_llm_finetuning_cases_description(),
+      url: "https://github.com/TZ-mx/llm-distillation-finetuning-cases",
+      tags: ["Python", "Qwen", "Fine-Tuning"],
+      monogram: "FT",
+    },
   ];
 }
