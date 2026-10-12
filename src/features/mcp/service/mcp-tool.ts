@@ -1,4 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import type { output, ZodType } from "zod";
 import type { OAuthScopeRequest } from "@/features/oauth-provider/schema/oauth-provider.schema";
 import type { McpToolContext } from "./mcp.types";
@@ -12,6 +13,7 @@ type McpToolTextContent = {
 type McpToolErrorResult = {
   content: McpToolTextContent[];
   isError: true;
+  structuredContent?: Record<string, unknown>;
 };
 
 type McpToolSuccessResult = {
@@ -23,6 +25,8 @@ type McpToolSuccessResult = {
 export type McpToolResult = McpToolErrorResult | McpToolSuccessResult;
 
 interface McpToolBase<TOutputSchema extends ZodType | undefined = ZodType> {
+  annotations?: ToolAnnotations;
+  structuredErrors?: boolean;
   description: string;
   name: string;
   outputSchema?: TOutputSchema;
@@ -75,10 +79,15 @@ export function registerMcpTool(
         description: tool.description,
         inputSchema: tool.inputSchema,
         outputSchema: tool.outputSchema,
+        annotations: tool.annotations,
       },
       async (args: output<typeof tool.inputSchema>) => {
         if (!canAccessTool(context, tool.requiredScopes)) {
-          return createScopeErrorResult(context, tool.requiredScopes);
+          return createScopeErrorResult(
+            context,
+            tool.requiredScopes,
+            tool.structuredErrors,
+          );
         }
 
         return await tool.handler(args, context);
@@ -93,10 +102,15 @@ export function registerMcpTool(
     {
       description: tool.description,
       outputSchema: tool.outputSchema,
+      annotations: tool.annotations,
     },
     async (_extra) => {
       if (!canAccessTool(context, tool.requiredScopes)) {
-        return createScopeErrorResult(context, tool.requiredScopes);
+        return createScopeErrorResult(
+          context,
+          tool.requiredScopes,
+          tool.structuredErrors,
+        );
       }
 
       return await tool.handler(context);

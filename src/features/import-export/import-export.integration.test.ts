@@ -1,4 +1,4 @@
-import { env } from "cloudflare:test";
+import { env, introspectWorkflow } from "cloudflare:test";
 import type { JSONContent } from "@tiptap/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { PostFrontmatter } from "@/features/import-export/import-export.schema";
@@ -16,7 +16,9 @@ import {
 import * as PostRepo from "@/features/posts/data/posts.data";
 import * as TagRepo from "@/features/tags/data/tags.data";
 import { getDb } from "@/lib/db";
-import { PostTagsTable } from "@/lib/db/schema";
+import { MediaTable, PostMediaTable, PostTagsTable } from "@/lib/db/schema";
+import { startImport } from "./import-export.service";
+import { buildZip } from "./utils/zip";
 
 // --- Helpers ---
 
@@ -199,6 +201,197 @@ describe("Import/Export Integration", () => {
     });
   });
 
+  describe("导入完整性", () => {
+    it("后台提交任务失败时不遗留临时 ZIP", async () => {
+      const brokenEnv = {
+        ...env,
+        IMPORT_WORKFLOW: {
+          create: async () => {
+            throw new Error("WORKFLOW_UNAVAILABLE");
+          },
+        },
+      } as unknown as Env;
+      const bytes = buildZip({
+        "valid.md": "---\ntitle: Valid\nslug: valid-post\n---\n正文",
+      });
+      const result = await startImport({ env: brokenEnv }, [
+        new File([new Uint8Array(bytes)], "valid.zip", {
+          type: "application/zip",
+        }),
+      ]);
+      expect(result.error?.reason).toBe("WORKFLOW_CREATE_FAILED");
+      expect((await env.R2.list({ prefix: "imports/" })).objects).toHaveLength(
+        0,
+      );
+    });
+    it("后台拒绝损坏的 manifest，不擅自识别为 Markdown 包", async () => {
+      const workflows = await introspectWorkflow(env.IMPORT_WORKFLOW);
+      try {
+        const bytes = buildZip({
+          "manifest.json": "{broken",
+          "valid.md":
+            "---\ntitle: Valid\nslug: invalid-manifest-post\n---\n正文",
+        });
+        const result = await startImport({ env }, [
+          new File([new Uint8Array(bytes)], "broken.zip", {
+            type: "application/zip",
+          }),
+        ]);
+        for (const instance of workflows.get())
+          await instance.waitForStatus("complete");
+        expect(result.error?.reason).toBe("UPLOAD_FAILED");
+        expect(workflows.get()).toHaveLength(0);
+      } finally {
+        await workflows.dispose();
+      }
+    });
+    it("文章入库失败时回收本次上传的未引用图片", async () => {
+      await env.DB.prepare(
+        "CREATE TRIGGER reject_import BEFORE INSERT ON posts WHEN NEW.slug = 'reject-import' BEGIN SELECT RAISE(FAIL, 'POST_INSERT_REJECTED'); END",
+      ).run();
+      const png = Uint8Array.from(
+        atob(
+          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jP1sAAAAASUVORK5CYII=",
+        ),
+        (c) => c.charCodeAt(0),
+      );
+      const files = {
+        "reject.md": toBytes(
+          "---\ntitle: Reject\nslug: reject-import\n---\n正文\n\n![图](a.png)",
+        ),
+        "a.png": png,
+      };
+      await expect(
+        importSinglePost(
+          env,
+          files,
+          enumerateMarkdownPosts(files)[0],
+          "markdown",
+          "zh",
+          { statusPolicy: "force-draft", taskId: "reject-task" },
+        ),
+      ).rejects.toThrow();
+      expect(await db.select().from(MediaTable)).toHaveLength(0);
+      expect((await env.R2.list({ prefix: "import-" })).objects).toHaveLength(
+        0,
+      );
+      expect(await db.select().from(PostTagsTable)).toHaveLength(0);
+      expect(await PostRepo.findPostBySlug(db, "reject-import")).toBeNull();
+    });
+    it("缺少本地图片时拒绝创建不完整的文章", async () => {
+      const files = {
+        "missing.md": toBytes(
+          "---\ntitle: Missing\nslug: missing-image\n---\n正文\n\n![图](images/missing.png)",
+        ),
+      };
+      await expect(
+        importSinglePost(
+          env,
+          files,
+          enumerateMarkdownPosts(files)[0],
+          "markdown",
+        ),
+      ).rejects.toMatchObject({
+        code: "IMAGE_IMPORT_FAILED",
+        imageFailures: [
+          { source: "images/missing.png", code: "IMAGE_NOT_FOUND" },
+        ],
+      });
+      expect(await PostRepo.findPostBySlug(db, "missing-image")).toBeNull();
+      expect(await db.select().from(MediaTable)).toHaveLength(0);
+    });
+
+    it("重复 slug 在上传图片之前跳过，不产生孤立媒体", async () => {
+      await PostRepo.insertPost(db, {
+        title: "原文",
+        slug: "same-slug",
+        status: "published",
+      });
+      const png = Uint8Array.from(
+        atob(
+          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jP1sAAAAASUVORK5CYII=",
+        ),
+        (c) => c.charCodeAt(0),
+      );
+      const files = {
+        "duplicate.md": toBytes(
+          "---\ntitle: Duplicate\nslug: same-slug\n---\n![图](a.png)",
+        ),
+        "a.png": png,
+      };
+      const result = await importSinglePost(
+        env,
+        files,
+        enumerateMarkdownPosts(files)[0],
+        "markdown",
+      );
+      expect(result.skipped).toBe(true);
+      expect(await db.select().from(MediaTable)).toHaveLength(0);
+    });
+
+    it("Workflow 重放返回同一篇草稿，图片与关联也只创建一次", async () => {
+      const png = Uint8Array.from(
+        atob(
+          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jP1sAAAAASUVORK5CYII=",
+        ),
+        (c) => c.charCodeAt(0),
+      );
+      const files = {
+        "replay.md": toBytes(
+          "---\ntitle: Replay\nslug: replay\nstatus: published\ntags: [MCP]\n---\n正文\n\n![图](a.png)",
+        ),
+        "a.png": png,
+      };
+      const entry = enumerateMarkdownPosts(files)[0];
+      const options = {
+        statusPolicy: "force-draft" as const,
+        taskId: "test-replay-task",
+      };
+      const first = await importSinglePost(
+        env,
+        files,
+        entry,
+        "markdown",
+        "zh",
+        options,
+      );
+      const second = await importSinglePost(
+        env,
+        files,
+        entry,
+        "markdown",
+        "zh",
+        options,
+      );
+      expect(second).toEqual(first);
+      expect(first).toMatchObject({
+        postId: expect.any(Number),
+        status: "draft",
+        slug: "replay",
+      });
+      expect(await db.select().from(MediaTable)).toHaveLength(1);
+      expect(await db.select().from(PostMediaTable)).toHaveLength(1);
+      expect(await PostRepo.findPostBySlug(db, "replay")).toMatchObject({
+        status: "draft",
+        publishedAt: null,
+        tags: [{ name: "MCP" }],
+      });
+    });
+
+    it("包内 content.json 损坏时明确失败，不替换成其他正文", async () => {
+      const files = {
+        "posts/broken/index.md": toBytes(
+          "---\ntitle: Broken\nslug: broken-json\n---\n正文",
+        ),
+        "posts/broken/content.json": toBytes("{broken"),
+      };
+      await expect(
+        importSinglePost(env, files, enumerateNativePosts(files)[0], "native"),
+      ).rejects.toMatchObject({ code: "INVALID_CONTENT_JSON" });
+      expect(await PostRepo.findPostBySlug(db, "broken-json")).toBeNull();
+    });
+  });
+
   describe("Markdown mode import", () => {
     it("should enumerate and import a markdown post", async () => {
       const frontmatter: PostFrontmatter = {
@@ -371,6 +564,35 @@ describe("Import/Export Integration", () => {
   });
 
   describe("Draft post import", () => {
+    it("MCP 强制草稿策略覆盖包内发布状态和发布日期", async () => {
+      const zipFiles = buildMarkdownZipFiles([
+        {
+          fileName: "force-draft.md",
+          frontmatter: {
+            title: "Force Draft",
+            slug: "force-draft",
+            status: "published",
+            publishedAt: "2026-01-01T00:00:00.000Z",
+            readTimeInMinutes: 1,
+            tags: [],
+          },
+          markdown: "必须保存为草稿的正文。",
+        },
+      ]);
+      await importSinglePost(
+        env,
+        zipFiles,
+        enumerateMarkdownPosts(zipFiles)[0],
+        "markdown",
+        "zh",
+        {
+          statusPolicy: "force-draft",
+        },
+      );
+      const post = await PostRepo.findPostBySlug(db, "force-draft");
+      expect(post).toMatchObject({ status: "draft", publishedAt: null });
+    });
+
     it("should import draft post with null publishedAt", async () => {
       const zipFiles = buildNativeZipFiles([
         {

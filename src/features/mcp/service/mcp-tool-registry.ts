@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { mcpAnalyticsTools } from "../features/analytics";
 import { mcpCommentsTools } from "../features/comments";
 import { mcpFriendLinksTools } from "../features/friend-links";
+import { mcpImportTools } from "../features/imports";
 import { mcpMediaTools } from "../features/media";
 import { mcpPersonalAiHubTools } from "../features/personal-ai-hub";
 import { mcpPostsTools } from "../features/posts";
@@ -16,6 +17,7 @@ const MCP_TOOLS: McpToolDefinition[] = [
   ...mcpCommentsTools,
   ...mcpFriendLinksTools,
   ...mcpMediaTools,
+  ...mcpImportTools,
   ...mcpPersonalAiHubTools,
   ...mcpPostsTools,
   ...mcpSearchTools,

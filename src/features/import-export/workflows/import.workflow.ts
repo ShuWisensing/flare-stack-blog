@@ -1,233 +1,138 @@
 import type { WorkflowEvent, WorkflowStep } from "cloudflare:workers";
 import { WorkflowEntrypoint } from "cloudflare:workers";
 import * as CacheService from "@/features/cache/cache.service";
-import type {
-  ImportReport,
-  TaskProgress,
-} from "@/features/import-export/import-export.schema";
-import { IMPORT_EXPORT_CACHE_KEYS } from "@/features/import-export/import-export.schema";
-import { parseZip } from "@/features/import-export/utils/zip";
-import {
-  enumerateMarkdownPosts,
-  enumerateNativePosts,
-  importSinglePost,
-} from "@/features/import-export/workflows/import-helpers";
+import { saveImportProgress } from "@/features/mcp/data/mcp-operations.data";
+import { getDb } from "@/lib/db";
 import { serverEnv } from "@/lib/env/server.env";
-import { m } from "@/paraglide/messages";
+import {
+  IMPORT_EXPORT_CACHE_KEYS,
+  type TaskProgress,
+} from "../import-export.schema";
+import { parseZip } from "../utils/zip";
+import { enumerateMarkdownPosts, enumerateNativePosts } from "./import-helpers";
+import {
+  emptyImportReport,
+  importPostStep,
+  importProgress,
+} from "./import-report";
 
 export class ImportWorkflow extends WorkflowEntrypoint<
   Env,
   ImportWorkflowParams
 > {
   async run(event: WorkflowEvent<ImportWorkflowParams>, step: WorkflowStep) {
-    const { taskId, r2Key, mode, locale: requestedLocale } = event.payload;
-    const progressKey = IMPORT_EXPORT_CACHE_KEYS.importProgress(taskId);
-    const locale = requestedLocale ?? serverEnv(this.env).LOCALE;
-
-    console.log(
-      JSON.stringify({ message: "import workflow started", taskId, mode }),
-    );
-
+    const {
+      taskId,
+      r2Key,
+      mode,
+      tracked = false,
+      statusPolicy = "preserve",
+    } = event.payload;
+    const locale = event.payload.locale ?? serverEnv(this.env).LOCALE;
+    const report = emptyImportReport();
+    let total = 0;
+    let completed = 0;
     try {
-      // 1. Enumerate posts from ZIP
-      // NOTE: step.do() serializes return values as JSON for durability.
-      // Uint8Array does NOT survive JSON round-tripping, so we must NOT
-      // return binary data from steps. Instead, each step re-fetches the
-      // ZIP from R2 when it needs the binary content.
-      const postEntries = await step.do("enumerate posts", async () => {
-        const zipFiles = await this.fetchZipFiles(r2Key, locale);
-        if (mode === "native") {
-          return enumerateNativePosts(zipFiles);
-        }
-        return enumerateMarkdownPosts(zipFiles);
+      const entries = await step.do("enumerate posts", async () => {
+        const files = await this.fetchZipFiles(r2Key);
+        return mode === "native"
+          ? enumerateNativePosts(files)
+          : enumerateMarkdownPosts(files);
       });
-
-      console.log(
-        JSON.stringify({
-          message: "posts enumerated",
-          taskId,
-          count: postEntries.length,
-        }),
+      total = entries.length;
+      if (total === 0) throw new Error("NO_POSTS");
+      await this.updateProgress(
+        taskId,
+        tracked,
+        importProgress(report, total, completed, "processing"),
       );
-
-      if (postEntries.length === 0) {
-        await this.updateProgress(progressKey, {
-          status: "completed",
-          total: 0,
-          completed: 0,
-          current: "",
-          errors: [],
-          warnings: [m.import_export_import_warning_empty({}, { locale })],
-          report: { succeeded: [], failed: [], warnings: [] },
-        });
-        return;
-      }
-
-      // 2. Process each post
-      // Each step returns a delta (serializable). Accumulation happens outside
-      // steps so it re-executes correctly on workflow restart/replay.
-      const report: ImportReport = {
-        succeeded: [],
-        failed: [],
-        warnings: [],
-      };
-
-      for (let i = 0; i < postEntries.length; i++) {
-        const entry = postEntries[i];
-
+      for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i];
         const delta = await step.do(
-          `import post ${i + 1}/${postEntries.length}: ${entry.title || entry.dir}`,
+          `import post ${i + 1}/${total}: ${entry.title.slice(0, 120)}`,
           async () => {
-            const stepReport: ImportReport = {
-              succeeded: [],
-              failed: [],
-              warnings: [],
-            };
-
-            try {
-              const zipFiles = await this.fetchZipFiles(r2Key, locale);
-              const result = await importSinglePost(
-                this.env,
-                zipFiles,
-                entry,
-                mode,
-                locale,
-              );
-              if (result.skipped) {
-                stepReport.warnings.push(
-                  m.import_export_import_warning_slug_skipped(
-                    { title: result.title },
-                    { locale },
-                  ),
-                );
-              } else {
-                stepReport.succeeded.push({
-                  title: result.title,
-                  slug: result.slug,
-                });
-              }
-              for (const w of result.warnings) {
-                stepReport.warnings.push(
-                  m.import_export_import_warning_scoped(
-                    { title: result.title, warning: w },
-                    { locale },
-                  ),
-                );
-              }
-            } catch (error) {
-              const reason =
-                error instanceof Error ? error.message : String(error);
-              stepReport.failed.push({
-                title: entry.title || entry.dir,
-                reason,
-              });
-            }
-
-            return stepReport;
+            // 二进制不经过 step 的 JSON 序列化；每步从 R2 重新读取。
+            return importPostStep(
+              this.env,
+              await this.fetchZipFiles(r2Key),
+              entry,
+              mode,
+              taskId,
+              statusPolicy,
+              locale,
+            );
           },
         );
-
-        // Accumulate outside step — on replay, cached return values flow here
         report.succeeded.push(...delta.succeeded);
         report.failed.push(...delta.failed);
+        report.skipped.push(...delta.skipped);
+        report.imageFailures.push(...delta.imageFailures);
         report.warnings.push(...delta.warnings);
-
-        console.log(
-          JSON.stringify({
-            message: "post import step completed",
-            taskId,
-            step: i + 1,
-            total: postEntries.length,
-            title: entry.title || entry.dir,
-            succeeded: delta.succeeded.length,
-            failed: delta.failed.length,
-          }),
+        completed = i + 1;
+        // 完整报告随进度保存；重放时由各步的持久化返回值重新累积。
+        await this.updateProgress(
+          taskId,
+          tracked,
+          importProgress(report, total, completed, "processing", entry.title),
         );
-
-        // Progress update outside step — idempotent KV write, safe on replay
-        await this.updateProgress(progressKey, {
-          status: "processing",
-          total: postEntries.length,
-          completed: i + 1,
-          current: entry.title || entry.dir,
-          errors: report.failed.map((f) => ({
-            post: f.title,
-            reason: f.reason,
-          })),
-          warnings: report.warnings,
-        });
       }
-
-      // 3. Cleanup and finalize
       await step.do("finalize", async () => {
-        try {
-          await this.env.R2.delete(r2Key);
-        } catch {
-          // Ignore cleanup errors
-        }
-
-        await this.updateProgress(progressKey, {
-          status: "completed",
-          total: postEntries.length,
-          completed: postEntries.length,
-          current: "",
-          errors: report.failed.map((f) => ({
-            post: f.title,
-            reason: f.reason,
-          })),
-          warnings: report.warnings,
-          report,
-        });
+        await this.updateProgress(
+          taskId,
+          tracked,
+          importProgress(report, total, completed, "completed"),
+        );
+        await this.env.R2.delete(r2Key);
       });
-
       console.log(
         JSON.stringify({
           message: "import workflow completed",
           taskId,
           succeeded: report.succeeded.length,
           failed: report.failed.length,
-          warnings: report.warnings.length,
+          skipped: report.skipped.length,
         }),
       );
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       console.error(
         JSON.stringify({
           message: "import workflow failed",
           taskId,
-          error: error instanceof Error ? error.message : String(error),
+          error: message,
         }),
       );
-      await this.updateProgress(progressKey, {
-        status: "failed",
-        total: 0,
-        completed: 0,
-        current: "",
-        errors: [],
-        warnings: [
-          error instanceof Error
-            ? error.message
-            : m.import_export_common_unknown_error({}, { locale }),
-        ],
-      });
+      // 保留已处理文章和图片失败信息，不把进度清零。
+      await this.updateProgress(
+        taskId,
+        tracked,
+        importProgress(report, total, completed, "failed", "", {
+          code: "IMPORT_WORKFLOW_FAILED",
+          message,
+        }),
+      );
+      throw error;
     }
   }
 
-  private async fetchZipFiles(
-    r2Key: string,
-    locale: "zh" | "en",
-  ): Promise<Record<string, Uint8Array>> {
-    const r2Object = await this.env.R2.get(r2Key);
-    if (!r2Object) {
-      throw new Error(m.import_export_import_error_zip_missing({}, { locale }));
-    }
-    const arrayBuffer = await r2Object.arrayBuffer();
-    return parseZip(new Uint8Array(arrayBuffer));
+  private async fetchZipFiles(r2Key: string) {
+    const object = await this.env.R2.get(r2Key);
+    if (!object) throw new Error("IMPORT_FILE_MISSING");
+    return parseZip(new Uint8Array(await object.arrayBuffer()));
   }
 
-  private async updateProgress(key: string, progress: TaskProgress) {
-    const context: BaseContext = { env: this.env };
-    await CacheService.set(context, key, JSON.stringify(progress), {
-      ttl: "24h",
-    });
+  private async updateProgress(
+    taskId: string,
+    tracked: boolean,
+    progress: TaskProgress,
+  ) {
+    if (tracked) await saveImportProgress(getDb(this.env), taskId, progress);
+    else
+      await CacheService.set(
+        { env: this.env },
+        IMPORT_EXPORT_CACHE_KEYS.importProgress(taskId),
+        JSON.stringify(progress),
+        { ttl: "24h" },
+      );
   }
 }

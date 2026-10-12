@@ -1,9 +1,28 @@
 import type { SQL } from "drizzle-orm";
-import { and, desc, eq, lt, sql, sum } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, notExists, sql, sum } from "drizzle-orm";
 import { escapeLikeString } from "@/features/media/data/helper";
 import { MediaTable, PostMediaTable } from "@/lib/db/schema";
 
 export type Media = typeof MediaTable.$inferSelect;
+
+export async function findMediaByKey(db: DB, key: string) {
+  const [media] = await db
+    .select()
+    .from(MediaTable)
+    .where(eq(MediaTable.key, key));
+  return media;
+}
+
+export async function insertMediaIdempotently(
+  db: DB,
+  data: typeof MediaTable.$inferInsert,
+) {
+  await db
+    .insert(MediaTable)
+    .values(data)
+    .onConflictDoNothing({ target: MediaTable.key });
+  return await findMediaByKey(db, data.key);
+}
 
 export async function insertMedia(
   db: DB,
@@ -15,6 +34,24 @@ export async function insertMedia(
 
 export async function deleteMedia(db: DB, key: string) {
   await db.delete(MediaTable).where(eq(MediaTable.key, key));
+}
+
+export async function deleteUnlinkedMedia(db: DB, keys: string[]) {
+  if (keys.length === 0) return [];
+  return await db
+    .delete(MediaTable)
+    .where(
+      and(
+        inArray(MediaTable.key, [...new Set(keys)]),
+        notExists(
+          db
+            .select({ postId: PostMediaTable.postId })
+            .from(PostMediaTable)
+            .where(eq(PostMediaTable.mediaId, MediaTable.id)),
+        ),
+      ),
+    )
+    .returning({ key: MediaTable.key });
 }
 
 export async function updateMediaName(db: DB, key: string, name: string) {

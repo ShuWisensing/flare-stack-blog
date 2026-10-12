@@ -2,6 +2,7 @@ export * from "./auth.table";
 export * from "./comments.table";
 export * from "./config.table";
 export * from "./friend-links.table";
+export * from "./mcp.table";
 export * from "./media.table";
 export * from "./page-views.table";
 export * from "./post-revisions.table";

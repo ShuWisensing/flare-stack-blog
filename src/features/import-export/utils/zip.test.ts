@@ -10,6 +10,42 @@ import {
 } from "@/features/import-export/utils/zip";
 
 describe("buildZip + parseZip round-trip", () => {
+  it("拒绝越过压缩包根目录的文件路径", () => {
+    const zip = buildZip({ "../outside.md": "禁止越界" });
+    expect(() => parseZip(zip)).toThrow("UNSAFE_ARCHIVE_PATH");
+  });
+
+  it.each([
+    "/absolute.md",
+    "a\\bad.md",
+    "C:/bad.md",
+    "folder/../bad.md",
+    "__proto__/bad.md",
+    "a//bad.md",
+  ])("拒绝不安全或歧义路径 %s", (path) => {
+    expect(() => parseZip(buildZip({ [path]: "正文" }))).toThrow(
+      "UNSAFE_ARCHIVE_PATH",
+    );
+  });
+
+  it("在解压前限制文件数量和解压总量", () => {
+    expect(() =>
+      parseZip(
+        buildZip(
+          Object.fromEntries(
+            Array.from({ length: 201 }, (_, i) => [`${i}.txt`, "x"]),
+          ),
+        ),
+      ),
+    ).toThrow("ARCHIVE_LIMIT_EXCEEDED");
+    expect(() =>
+      parseZip(buildZip({ "large.txt": new Uint8Array(40 * 1024 * 1024 + 1) })),
+    ).toThrow("ARCHIVE_LIMIT_EXCEEDED");
+    expect(() => parseZip(new Uint8Array(20 * 1024 * 1024 + 1))).toThrow(
+      "ARCHIVE_TOO_LARGE",
+    );
+  });
+
   it("should round-trip a single text file", () => {
     const zip = buildZip({ "hello.txt": "world" });
     const files = parseZip(zip);

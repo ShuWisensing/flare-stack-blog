@@ -41,6 +41,8 @@ declare global {
     r2Key: string;
     mode: "native" | "markdown";
     locale?: "zh" | "en";
+    statusPolicy?: "preserve" | "force-draft";
+    tracked?: boolean;
   }
 
   interface Env extends Cloudflare.Env {

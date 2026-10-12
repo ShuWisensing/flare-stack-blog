@@ -24,7 +24,38 @@ export function buildZip(
  * @returns 文件路径 → 内容的映射
  */
 export function parseZip(data: Uint8Array): Record<string, Uint8Array> {
-  return unzipSync(data);
+  if (data.byteLength > 20 * 1024 * 1024) {
+    throw new Error("ARCHIVE_TOO_LARGE");
+  }
+  let totalSize = 0;
+  const names = new Set<string>();
+  return unzipSync(data, {
+    filter: ({ name, originalSize }) => {
+      if (
+        name.startsWith("/") ||
+        name.includes("\\") ||
+        name.includes("\0") ||
+        name.includes(":") ||
+        name.includes("//") ||
+        name.split("/").includes("..") ||
+        name.split("/").includes(".") ||
+        name
+          .split("/")
+          .some((part) =>
+            ["__proto__", "constructor", "prototype"].includes(part),
+          ) ||
+        names.has(name)
+      ) {
+        throw new Error("UNSAFE_ARCHIVE_PATH");
+      }
+      names.add(name);
+      totalSize += originalSize;
+      if (names.size > 200 || totalSize > 40 * 1024 * 1024) {
+        throw new Error("ARCHIVE_LIMIT_EXCEEDED");
+      }
+      return true;
+    },
+  });
 }
 
 /**

@@ -4,6 +4,7 @@ import type {
   TaskProgress,
 } from "@/features/import-export/import-export.schema";
 import {
+  EXPORT_MANIFEST_VERSION,
   ExportManifestSchema,
   IMPORT_EXPORT_CACHE_KEYS,
   IMPORT_EXPORT_R2_KEYS,
@@ -91,7 +92,8 @@ export async function startImport(context: BaseContext, files: Array<File>) {
       readValidatedJsonFile: readValidated,
     } = await import("@/features/import-export/utils/zip");
 
-    const isZip = files.length === 1 && files[0].name.endsWith(".zip");
+    const isZip =
+      files.length === 1 && files[0].name.toLowerCase().endsWith(".zip");
 
     if (isZip) {
       zipData = new Uint8Array(await files[0].arrayBuffer());
@@ -112,6 +114,11 @@ export async function startImport(context: BaseContext, files: Array<File>) {
       "manifest.json",
       ExportManifestSchema,
     );
+    if (
+      Object.hasOwn(zipFiles, "manifest.json") &&
+      (!manifest || manifest.version !== EXPORT_MANIFEST_VERSION)
+    )
+      throw new Error("INVALID_MANIFEST");
     mode = manifest ? "native" : "markdown";
   } catch (error) {
     console.error(
@@ -158,7 +165,7 @@ export async function startImport(context: BaseContext, files: Array<File>) {
 
   try {
     await context.env.IMPORT_WORKFLOW.create({
-      params: { taskId, r2Key, mode, locale },
+      params: { taskId, r2Key, mode, locale, statusPolicy: "preserve" },
     });
   } catch (error) {
     console.error(
@@ -171,6 +178,7 @@ export async function startImport(context: BaseContext, files: Array<File>) {
       context,
       IMPORT_EXPORT_CACHE_KEYS.importProgress(taskId),
     );
+    await context.env.R2.delete(r2Key);
     return err({ reason: "WORKFLOW_CREATE_FAILED" });
   }
 

@@ -1,5 +1,6 @@
 import { OAuthProvider } from "@cloudflare/workers-oauth-provider";
 import { McpApiHandler } from "@/features/mcp/api/mcp-api-handler";
+import { McpUploadHandler } from "@/features/mcp/api/mcp-upload-handler";
 import { createWorkersOAuthProviderOptions } from "@/features/oauth-provider/oauth-provider.config";
 import { appWorkerHandler } from "./app-handler";
 
@@ -14,6 +15,7 @@ function getOAuthProvider() {
     createWorkersOAuthProviderOptions({
       apiHandlers: {
         "/mcp": McpApiHandler,
+        "/api/mcp/uploads": McpUploadHandler,
       },
       defaultHandler: appWorkerHandler,
     }),

@@ -19,11 +19,49 @@ export const StartImportInputSchema = z.object({
   r2Key: z.string(),
   mode: z.enum(["native", "markdown"]),
   locale: ImportExportLocaleSchema.optional(),
+  statusPolicy: z.enum(["preserve", "force-draft"]).optional(),
+  tracked: z.boolean().optional(),
 });
 
 export type StartImportInput = z.infer<typeof StartImportInputSchema>;
 
 // --- Progress ---
+
+export const ImportSucceededSchema = z.object({
+  title: z.string(),
+  slug: z.string(),
+  postId: z.number().optional(),
+  status: z.enum(POST_STATUSES).optional(),
+  entryPath: z.string().optional(),
+});
+export const ImportFailedSchema = z.object({
+  title: z.string(),
+  reason: z.string(),
+  code: z.string().optional(),
+  entryPath: z.string().optional(),
+});
+export const ImportSkippedSchema = z.object({
+  title: z.string(),
+  slug: z.string(),
+  postId: z.number(),
+  reason: z.string(),
+  entryPath: z.string(),
+});
+export const ImportImageFailureSchema = z.object({
+  title: z.string(),
+  entryPath: z.string(),
+  source: z.string(),
+  code: z.string(),
+  reason: z.string(),
+});
+export const ImportOutcomeSchema = z.enum([
+  "in_progress",
+  "all_success",
+  "partial_failure",
+  "all_failed",
+  "all_skipped",
+  "failed",
+]);
 
 export const TaskProgressSchema = z.object({
   status: z.enum(["pending", "processing", "completed", "failed"]),
@@ -32,12 +70,16 @@ export const TaskProgressSchema = z.object({
   current: z.string(),
   errors: z.array(z.object({ post: z.string(), reason: z.string() })),
   warnings: z.array(z.string()),
+  outcome: ImportOutcomeSchema.optional(),
+  fatalError: z.object({ code: z.string(), message: z.string() }).optional(),
   downloadKey: z.string().optional(),
   report: z
     .object({
-      succeeded: z.array(z.object({ title: z.string(), slug: z.string() })),
-      failed: z.array(z.object({ title: z.string(), reason: z.string() })),
+      succeeded: z.array(ImportSucceededSchema),
+      failed: z.array(ImportFailedSchema),
       warnings: z.array(z.string()),
+      skipped: z.array(ImportSkippedSchema).optional(),
+      imageFailures: z.array(ImportImageFailureSchema).optional(),
     })
     .optional(),
 });
@@ -102,4 +144,5 @@ export interface PostEntry {
   title: string;
   prefix: string;
   mdPath?: string;
+  metadataError?: string;
 }

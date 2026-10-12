@@ -11,6 +11,7 @@ export default defineWorkersConfig(async () => {
   const migrations = await readD1Migrations(migrationsPath);
 
   return {
+    define: { __APP_VERSION__: JSON.stringify("test") },
     plugins: [
       viteTsConfigPaths({
         projects: ["./tsconfig.json"],
@@ -25,6 +26,7 @@ export default defineWorkersConfig(async () => {
       },
     },
     test: {
+      deps: { optimizer: { ssr: { enabled: true, include: ["ajv"] } } },
       env: loadEnv("test", process.cwd(), "VITE_"),
       setupFiles: ["./tests/apply-migrations.ts"],
       include: ["src/**/*.integration.test.ts"],

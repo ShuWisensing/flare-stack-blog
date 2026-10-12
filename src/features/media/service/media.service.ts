@@ -14,19 +14,30 @@ import { CACHE_CONTROL } from "@/lib/constants";
 import { err, ok } from "@/lib/errors";
 
 export async function upload(
-  context: DbContext & { executionCtx: ExecutionContext },
-  input: { file: File },
+  context: DbContext,
+  input: { file: File; storageKey?: string },
 ) {
   const { file } = input;
+
+  if (input.storageKey !== undefined) {
+    const existing = await MediaRepo.findMediaByKey(
+      context.db,
+      input.storageKey,
+    );
+    if (existing) return ok(existing);
+  }
 
   const dimensions = getImageDimensions(await file.arrayBuffer());
   const width = dimensions?.width;
   const height = dimensions?.height;
 
-  const uploaded = await Storage.putToR2(context.env, file);
+  const uploaded =
+    input.storageKey === undefined
+      ? await Storage.putToR2(context.env, file)
+      : await Storage.putToR2(context.env, file, input.storageKey);
 
   try {
-    const mediaRecord = await MediaRepo.insertMedia(context.db, {
+    const data = {
       key: uploaded.key,
       url: uploaded.url,
       fileName: uploaded.fileName,
@@ -34,7 +45,12 @@ export async function upload(
       sizeInBytes: uploaded.sizeInBytes,
       width,
       height,
-    });
+    };
+    const mediaRecord =
+      input.storageKey === undefined
+        ? await MediaRepo.insertMedia(context.db, data)
+        : await MediaRepo.insertMediaIdempotently(context.db, data);
+    if (!mediaRecord) throw new Error("MEDIA_RECORD_MISSING");
     return ok(mediaRecord);
   } catch (error) {
     console.error(
@@ -44,20 +60,7 @@ export async function upload(
         error: error instanceof Error ? error.message : String(error),
       }),
     );
-    context.executionCtx.waitUntil(
-      Storage.deleteFromR2(context.env, uploaded.key).catch((rollbackError) =>
-        console.error(
-          JSON.stringify({
-            message: "r2 rollback delete failed",
-            key: uploaded.key,
-            error:
-              rollbackError instanceof Error
-                ? rollbackError.message
-                : String(rollbackError),
-          }),
-        ),
-      ),
-    );
+    await Storage.deleteFromR2(context.env, uploaded.key);
     return err({ reason: "MEDIA_RECORD_CREATE_FAILED" });
   }
 }
@@ -100,6 +103,15 @@ export async function getMediaList(
 
 export async function isMediaInUse(context: DbContext, key: string) {
   return await PostMediaRepo.isMediaInUse(context.db, key);
+}
+
+/** 导入失败时只回收未被文章引用的图片，不影响已完成文章的共享图片。 */
+export async function rollbackUnusedUploads(
+  context: DbContext,
+  keys: string[],
+) {
+  const removed = await MediaRepo.deleteUnlinkedMedia(context.db, keys);
+  for (const item of removed) await Storage.deleteFromR2(context.env, item.key);
 }
 
 export async function getLinkedPosts(context: DbContext, key: string) {

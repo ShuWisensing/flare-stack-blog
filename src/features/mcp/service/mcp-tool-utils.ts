@@ -16,6 +16,7 @@ export function createTextToolResult(text: string) {
 export function createScopeErrorResult(
   context: McpToolContext,
   requiredScopes: OAuthScopeRequest,
+  structuredErrors = false,
 ) {
   const missingScopes = getMissingScopes(
     context.principal.scopes,
@@ -30,6 +31,18 @@ export function createScopeErrorResult(
       },
     ],
     isError: true as const,
+    ...(structuredErrors
+      ? {
+          structuredContent: {
+            error: {
+              code: "INSUFFICIENT_SCOPE",
+              message: `Missing required scopes: ${missingScopes.join(", ")}`,
+              retryable: false,
+              details: { missingScopes },
+            },
+          },
+        }
+      : {}),
   };
 }
 
