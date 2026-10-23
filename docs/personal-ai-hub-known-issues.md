@@ -1,13 +1,121 @@
 # Personal AI Hub 已知问题
 
-## HUB-27：Codex 子进程初始化退出（代码已修复，运行中服务待重启）
+## 2026-10-23 用户页面验收补充（V2 规划，尚未实现）
+
+完整改进规格与执行顺序见 [V2 工作区与聊天计划](personal-ai-hub-v2-workspace-chat-plan.md)。用户截图证明 Wiki 回答和 opencode 读取本机信息已可用；Codex 页面仍不可稳定使用，不能列为接入完成。
+
+### HUB-30：Codex 超时在博客端退化成笼统的上游错误（P1）
+
+- 现象：用户截图请求 f46e95ae-1726-4485-8c08-2488b9a63813 显示 HTTP 504 / HUB_UPSTREAM_ERROR。
+- 影响：无法从页面判断是登录探测、网关还是执行结果未知，妨碍正确处理。
+- 已核对：同请求在 E:\wiki\data\runtime\hub\api-20261023-113304.err.log 为 HUB_TIMEOUT，位于 Codex health → account/read；不是“完全没有适配代码”。
+- 初步判断：需核对公网响应的 Content-Type、安全错误体和博客解析；尚未确认哪一层改写，不能仅凭状态码归因校园网。
+- 下一步：隔离重放实际响应类型，区分 Hub JSON 超时与非 JSON 网关 504，保留请求编号；不从未知响应猜造登录失败原因。
+- 实施中隔离确认：旧代理对 Content-Type 做大小写敏感的 application/json 子串检查，会丢失 Application/JSON 和 application/problem+json 中合法的 HUB_TIMEOUT。两种变体已复现失败测试；这证明存在解析缺口，尚不能断言用户截图响应就是该类型。
+
+### HUB-31：Codex 下显示禁用的 DeepSeek 型号，模型语义误导（P2）
+
+- 现象/影响：选择 Codex 后仍看见 deepseek-flash，用户无法知道实际使用哪个模型。
+- 源码确认：Agent route 的模型框只有 disabled，未按 Runtime 改显示；发送时 Codex model 实际为 undefined，因此不是已证实把 DeepSeek 型号传给 Codex。
+- 下一步：Codex 显示本机配置/原生模型目录；Wiki、opencode 保留其 DeepSeek 选择，并展示实际返回的模型。
+
+### HUB-32：Agent 历史仍为原生 JSON，没有聊天消息恢复视图（P1）
+
+- 现象：用户截图展开 SESSION MESSAGES 后整页被 JSON 撑长；切回旧聊天不能按普通消息流阅读。
+- 影响：已有本地历史不等于前端历史聊天已实现，工具输出和注入提示暴露在主阅读路径。
+- 源码确认：messagesQuery.data.items 直接传入 InfoBox；agentMessageText 仅用于本次返回结果。InfoBox 默认已折叠，但展开后无高度上限，不能代替规范化消息流。
+- 下一步：原生历史适配到 user/assistant 展示模型，按原生 ID 去重并存本地快照；工具/诊断进入限高详情。Wiki 持久多轮属于新增功能，不冒称其旧缓存是完整聊天记录。
+
+### HUB-33：Markdown 与参数/引用布局影响正文阅读（P2）
+
+- 现象：Wiki 回答中的 ** 等语法按原文显示；引用路径、诊断和多排参数占据主要空间。
+- 源码确认：Wiki answer 位于 pre；Agent 当前回答用 p/纯文本；Wiki Timings/Execution 仍是直接 JSON 区块。
+- 影响：文章式 Markdown、代码与表格显示不正确，界面主要呈现接口调试信息。
+- 下一步：安全 Markdown、共享聊天布局、紧凑模型选择与引用入口，运行细节默认收起且限高；仅调整 Hub 路由布局。
+
+### HUB-34：寒暄也召回无关文档，缺少相关性门控（P1）
+
+- 现象：用户问“hello 介绍一下你自己”，Wiki 回答主要引用 DeepSeek/ESP32，说明资料里没有自己的身份。
+- 源码确认：ChatService 将 Top-K/重排结果直接送入回答，DeepSeek 提示只能基于上下文；没有明确的助手说明意图和校准后的低相关判定。
+- 影响：检索虽有结果但与用户意图无关；Agent 中也会出现不相关的参考资料。
+- 下一步：显式处理助手说明；对知识问题校准相关性门控与无答案行为，不静默切到通用模型；多轮新接口同时隔离上下文和缓存。
+
+### HUB-35：知识图谱的数据与读取接口尚未落地（P1，功能缺口）
+
+- 现象：用户希望像 Obsidian 一样浏览实体、概念和关系，并点击进入正文；当前博客没有图谱入口，本地 API 也没有知识图谱读取契约。
+- 只读核验（2026-10-23）：`E:\wiki\data\indexes\metadata.sqlite` 有 sources=21、summaries=21、chunks=5237、assets=68，但 wiki_pages=0、change_sets=0，`data\wiki` 下没有 Markdown 页面。`settings.py` 虽定义 graph_db_path，目标 `data\indexes\graph.sqlite` 不存在；当前源码没有对应的节点/边存储实现。
+- 初步判断：主需求文档中的 nodes / edges / aliases 属于目标设计，不能当作已有数据库。已有 source_id 关联可以展示资料结构；实体/概念及其语义关系尚无实际记录可供展示。此处是实现与数据缺口，不是已确认的数据丢失。
+- 影响：仅增加一个前端画布不能完成用户要求的实体/概念图谱；还需只读投影、节点内容读取与有效关系来源。不能以向量相似度或任意关键词连线代替真实关系。
+- 下一步：按 V2 第 7.2 节、阶段 3B 建立 metadata / 已登记 Markdown 的只读图谱投影，知识网络与资料结构由用户明确选择。实体为空时显示真实空态，并保留“实体/概念数据待补齐”验收阻塞；若另有实体库，先核实位置、结构和来源，再单独明确接入契约。
+- 范围：本轮不自动抽取实体、不调用额外模型、不创建 graph.sqlite、不迁移或改写知识库。阶段 4 实现图谱与阅读交互；资料图通过不能代替实体/概念图的验收。
+
+### HUB-36：V2 初始化应先拒绝陌生数据库，再启用 WAL（已修复，临时库验证）
+
+- 现象/复现：临时 foreign.sqlite 只有 unrelated 表，初始化虽拒绝继续使用，却先执行了 PRAGMA journal_mode=WAL，文件头发生变化；`test_refusing_an_unknown_database_does_not_modify_its_bytes` 已复现失败。
+- 范围：仅在本轮新增、尚未接入生产运行的 ConversationStore 中发现；未发现记录删除，本轮未用此代码打开真实陌生库。
+- 根因：WAL 设置早于版本/表结构核验。
+- 修复：journal_mode 已移至成功验证/初始化之后，拒绝不完整或陌生结构；原文件字节保持不变的回归已通过。
+
+### HUB-37：旧记录清点不能把空 cwd 当成当前目录（已修复，临时记录验证）
+
+- 现象/复现：临时记录的 cwd 为空，Path("").resolve() 会取进程当前目录；当它恰好是已登记项目时，错误地产生可归属工作区。`test_an_empty_cwd_is_not_interpreted_as_the_current_directory` 已复现失败。
+- 范围：本轮只读 LegacyImporter 清点功能，尚未提供真实数据写入或执行入口；不会据此自动运行旧任务。
+- 修复：空路径、相对路径均标为目录证据缺失，保持未归属，不从当前目录或唯一登记项目推断；相应回归已通过。
+
+### HUB-38：重复完成请求也须核对引用快照（已修复，临时库验证）
+
+- 现象/复现：新增 Store 原先只比对正文与原生消息 ID；正文相同但引用版本/证据变化时仍接受重复完成。`test_repeated_completion_with_changed_citations_is_a_conflict` 已复现失败。
+- 范围：新 SQLite 底座的完成事务，尚未接入真实 Runtime 执行；本轮没有更改生产历史。
+- 修复：重复完成同时比对引用编号、用途、知识版本与快照；不一致明确冲突，保留首次已提交的回答、引用和运行详情；失败用例已转绿。
+
+### HUB-39：V1 问题入口与 Prompt 注入会裁剪代码空白（P2，阶段 2/4 待处理）
+
+- 源码线索：旧 HubRequest 启用 str_strip_whitespace；博客旧输入 schema 使用 trim；build_knowledge_injected_prompt 也调用 question.strip()。
+- 影响：问题以缩进代码开头时，会改变原始文本。新 SQLite 已按精确 UTF-8 保存/hash 问题，不代表旧入口与原生上下文已同步保真。
+- 下一步：阶段 2/4 的新 turn DTO、前端输入和原生注入层统一保留原问题空白，只用 strip 检查非空；补贯穿代理、存储与 Runtime 的回归。当前未改动旧问答入口。
+
+### HUB-40：Codex 原生响应缺少 cwd 时不能推断当前目录（已修复，协议替身验证）
+
+- 现象/复现：V1 校验使用 Path(configured.get("cwd", "")).resolve()；缺失、空字符串或相对目录可能恰好等于进程 cwd，从而越过确认检查。临时协议替身的三种失败回归已复现。
+- 影响：没有原生绝对目录确认也可能进入 turn/start；真实使用未复现，当前问题在隔离响应中确认。
+- 修复：先校验 cwd 为非空绝对路径，再与已登记工作目录比对；无法确认即 AGENT_POLICY_MISMATCH，禁止提交 turn，不创建替代任务。三个失败回归已转绿，后端最终全量 235 项通过；仍不能据此声称真实双轮任务已通过。
+
+### V2 新功能与协议风险
+
+- 新功能：按本地项目目录的工作区、多聊天、Wiki SQLite 历史与有限多轮、资料只读浏览、刷新后观察执行结果；新增 Obsidian 风格知识图谱、局部关系网、节点正文与双向链接浏览，数据缺口见 HUB-35。
+- 当前 CodexClient.cwd 在客户端实例上固定；opencode 请求未传工作区目录。工作区不能只加网页分组，必须在后端与原生协议共同绑定。
+- 本机 Codex 0.159.2 schema 有 historyMode / 分页方法，默认 legacy；现有 Adapter 尚不识别分页模式。此项是兼容风险，尚未复现实际历史丢失，不标为已发生的数据损坏。
+- 本机 opencode 1.14.19 的全局 /doc 只列 auth/log，不足以核验项目目录路由。实施阶段须按实际协议和路径回读测试，不凭最新文档猜字段。
+
+## HUB-28：Windows PowerShell 5.1 进程记录嵌套导致停止失败（已修复并实际重启）
+
+- 现象：stop_hub.ps1 在 StrictMode 下报找不到 Id 属性，随后启动仍报 8000 占用。
+- 影响：原 Hub / opencode 仍运行，无法按脚本重启加载 HUB-27；本地与公网链路状态不能代替启停验收。
+- 根因：Windows PowerShell 5.1 的 ConvertFrom-Json 输出数组不会按 PowerShell 7 的方式枚举。外层 @(... | ConvertFrom-Json) 造成嵌套，Save-HubProcess 反复追加及默认 JSON 深度进一步损坏记录。已在 5.1 / 7 对照复现，并确认实际记录存在 value / Count 包装，部分原始身份已丢失。
+- 实测补充：无 BOM 的 UTF-8 中文行尾注释在 Windows PowerShell 5.1 下还会误吞下一行。原测试副本转写为 UTF-8 BOM，掩盖了该编码缺陷；已改为保留生产脚本字节，补做真实兼容验收。停止脚本曾返回成功而旧进程仍在，不能把输出提示作为停止证据。
+- 验证线索：E:\wiki\scripts\hub_common.ps1、stop_hub.ps1 和 data\runtime\hub\processes.json；实际监听 8000 / 4096 的进程仍存在。
+- 修复：统一扁平数组读取、完整身份校验及 UTC 日期字符串，追加保留原记录，成功停止后清空注册表；JSON 显式 UTF-8，中文脚本使用 UTF-8 BOM。坏记录在停止任何进程前明确拒绝，不自动猜测或跳过。
+- 验证：先复现 14 项失败；编码问题改为按生产字节复制后再次复现 3 项失败。最终两种 PowerShell 的脚本测试 27/27、后端全量 192/192 通过。实际在 5.1 下停止五个已核验身份的 Hub / opencode 进程，确认 8000 / 4096 释放后，以用户原参数重新启动并完成模型预热；新注册表为四条扁平身份记录。
+- 旧坏记录备份：E:\wiki\data\runtime\hub\processes-before-HUB-28-20261023-112600.json，复制前后 SHA256 一致。缺失的身份通过当前监听 PID、创建时间、可执行文件、命令及父子链逐项核验后重建；知识库和索引未改动。
+- 运行结果：本地与公网 health、知识库及 opencode 状态为 HTTP 200；Codex 状态已复测 HTTP 200 / ready。真实 Wiki 问答和 Agent 执行仍待管理员页面验收，Codex 状态间歇超时另见 HUB-29。
+
+## HUB-29：Codex 登录状态读取间歇超过 8 秒预算（P0，用户页面仍未稳定接通）
+
+- 现象：本轮重启后 /agent/status?runtime=codex 多次返回 HTTP 504 / HUB_TIMEOUT；同一真实 API 也已复测返回 HTTP 200、ready、workspace=E:\blog、mode=read-only、billing=chatgpt。之后状态脚本检查仍再次超时，因此不能标记为稳定通过。
+- 影响：Agent 页检查状态时可能报超时；尚未发送真实执行任务，不能据此认定任务一定失败、账号无额度或校园网是唯一根因。
+- 初步判断：安全日志帧定位在 account/read 等待，初始化可完成；独立同环境进程也能读取 ChatGPT 登录。8 秒总预算正常执行，慢响应的更底层原因尚未确定。本轮未修改预算或添加自动重试。
+- 验证线索：api-20261023-113304.err.log，首次请求 b0bb3c1209c1473fb5978a8195d0cc55；真实 API 成功返回前核验子进程目录和可执行文件。全部检查只读取状态，没有模型任务。
+- 新证据：用户截图的请求 f46e95ae-1726-4485-8c08-2488b9a63813 同样在 account/read 超时。页面实际不可稳定使用，此项升级为 V2 阶段 0 的接入阻塞。
+- 下一步：按 V2 计划分离登录探测与状态读取，记录分段耗时和真实响应；用原生双轮读文件及历史恢复验收。执行请求仍不自动重发，不能用单次状态成功代替接入完成。
+
+## HUB-27：Codex 子进程初始化退出（已加载修复，状态复测通过）
 
 - 现象：2026-10-23 用户使用 -WithCodex -CodexWorkspace E:\blog 启动后，/agent/status?runtime=codex 返回 HTTP 503、AGENT_RUNTIME_NOT_READY，安全错误为“Codex 进程已退出”。
-- 影响：Codex Runtime 尚不可用；同次实测本地和公网健康检查、知识库状态、opencode 状态均为 HTTP 200。
+- 修复前影响：Codex Runtime 不可用；同次实测本地和公网健康检查、知识库状态、opencode 状态均为 HTTP 200。
 - 根因：禁用工具时生成 mcp_servers."filesystem".enabled=false 一类 CLI 覆盖键，CLI 点分解析把引号保留为名称，创建缺少 transport 的额外服务器配置。本机 CLI 0.159.2 支持 --stdio，问题与 Tunnel 无关。
 - 验证线索：本地 API 日志 api-20261023-093327.err.log，CodexTransport.__enter__ → initialize → _next；隔离诊断子进程退出码为 1，尚未发送模型任务。
 - 修复：汇总各级配置名称，用顶层 TOML 内联表设置 enabled=false，保留名称中的点与 @；MCP / 插件各一项隔离回归已通过。独立 app-server 初始化及 ChatGPT account/read 成功，未发送模型任务。
-- 下一步：用户重启运行中的 Hub 加载修改，再通过已部署博客验收状态和短任务；不自动重发执行请求。状态检查仍受 8 秒总预算约束，系统忙时可能显式超时。
+- 当前状态：HUB-28 修复后已实际重启 Hub，真实状态 API 返回 HTTP 200 / ready；8 秒预算下的间歇超时单列 HUB-29。后续通过已部署博客验收短任务，不自动重发执行请求。
 
 ## 2026-10-23 修复中补充发现
 

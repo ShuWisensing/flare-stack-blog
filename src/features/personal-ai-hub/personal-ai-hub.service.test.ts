@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  checkCodexConnection,
   createAgentSession,
   getAgentStatus,
   getHubApiConfig,
@@ -10,6 +11,113 @@ import {
 } from "@/features/personal-ai-hub/service/personal-ai-hub.service";
 
 describe("Personal AI Hub service", () => {
+  it("requests a protected Codex check and reads its accepted identifier", async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json(
+        {
+          runtime: "codex",
+          check_id: "check-a",
+          runtime_status: {
+            status: "checking",
+            check_id: "check-a",
+            checked_at: null,
+            expires_at: null,
+          },
+        },
+        { status: 202 },
+      ),
+    );
+    const result = await checkCodexConnection({
+      env: {
+        PERSONAL_AI_HUB_API_URL: "https://hub.test",
+        PERSONAL_AI_HUB_API_TOKEN: "private",
+      },
+      fetch: fetchMock,
+    });
+    expect(result.data?.check_id).toBe("check-a");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://hub.test/hub/runtimes/codex/checks",
+      expect.objectContaining({
+        method: "POST",
+        redirect: "manual",
+        headers: expect.objectContaining({ "X-Hub-Token": "private" }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a Codex failure snapshot without a usable error", async () => {
+    const result = await getAgentStatus(
+      {
+        env: {
+          PERSONAL_AI_HUB_API_URL: "https://hub.test",
+          PERSONAL_AI_HUB_API_TOKEN: "private",
+        },
+        fetch: async () =>
+          Response.json({
+            runtime: "codex",
+            runtime_status: { status: "error" },
+          }),
+      },
+      "codex",
+    );
+    expect(result.error?.reason).toBe("HUB_RESPONSE_INVALID");
+  });
+
+  it.each([
+    "application/json",
+    "Application/JSON; charset=utf-8",
+    "application/problem+json",
+  ])("preserves the local timeout reason for JSON media type %s", async (contentType) => {
+    const result = await getAgentStatus(
+      {
+        env: {
+          PERSONAL_AI_HUB_API_URL: "https://hub.test",
+          PERSONAL_AI_HUB_API_TOKEN: "private",
+        },
+        fetch: async () =>
+          new Response(
+            JSON.stringify({
+              error: { reason: "HUB_TIMEOUT", layer: "agent_runtime" },
+            }),
+            {
+              status: 504,
+              headers: { "Content-Type": contentType },
+            },
+          ),
+      },
+      "codex",
+    );
+    expect(result.error).toMatchObject({
+      reason: "HUB_TIMEOUT",
+      layer: "agent_runtime",
+      upstreamStatus: 504,
+    });
+  });
+
+  it("distinguishes a non-JSON gateway timeout from a Hub execution timeout", async () => {
+    const result = await getAgentStatus(
+      {
+        env: {
+          PERSONAL_AI_HUB_API_URL: "https://hub.test",
+          PERSONAL_AI_HUB_API_TOKEN: "private",
+        },
+        fetch: async () =>
+          new Response("<html>private gateway</html>", {
+            status: 504,
+            headers: { "Content-Type": "text/html" },
+          }),
+      },
+      "codex",
+    );
+    expect(result.error).toMatchObject({
+      reason: "HUB_UPSTREAM_TIMEOUT",
+      layer: "blog_proxy",
+      upstreamStatus: 504,
+    });
+    expect(JSON.stringify(result)).not.toContain("private");
+  });
+
   it("preserves unknown execution state without recommending a resend", async () => {
     const result = await sendAgentChatMessage(
       {
@@ -316,9 +424,10 @@ describe("Personal AI Hub service", () => {
     expect(
       (await listAgentSessions(context, "opencode")).data?.items[0].id,
     ).toBe("ses_1");
-    expect(
-      (await getAgentStatus(context, "opencode")).data?.runtime_status.busy,
-    ).toBe(false);
+    expect(await getAgentStatus(context, "opencode")).toMatchObject({
+      data: { runtime: "opencode", runtime_status: { busy: false } },
+      error: null,
+    });
     expect(
       (await listAgentMessages(context, "ses_1", "opencode")).data?.items[0].id,
     ).toBe("msg_1");

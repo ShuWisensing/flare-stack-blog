@@ -1,9 +1,10 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { Bot, Loader2, Plus, RefreshCw, Send } from "lucide-react";
 import { useRef, useState } from "react";
 import { agentMessageText } from "@/features/personal-ai-hub/agent-message";
 import {
+  checkPersonalAiHubCodexFn,
   createPersonalAiHubAgentSessionFn,
   getPersonalAiHubAgentStatusFn,
   listPersonalAiHubAgentMessagesFn,
@@ -27,6 +28,7 @@ export const Route = createFileRoute("/admin/personal-ai-hub/agent-chat")({
 });
 
 function AgentChatPage() {
+  const queryClient = useQueryClient();
   const operationPending = useRef(false);
   const startOperation = (action: () => void) => {
     if (operationPending.current) return;
@@ -66,11 +68,35 @@ function AgentChatPage() {
   const statusQuery = useQuery({
     retry: false,
     queryKey: ["personal-ai-hub", "agent-status", runtime],
+    refetchInterval: (query) => {
+      if (runtime !== "codex") return false;
+      const state = query.state.data?.runtime_status;
+      if (state?.status === "checking") return 1000;
+      if (state?.status === "ready" && typeof state.expires_at === "string") {
+        return Math.max(
+          1000,
+          Math.min(60000, Date.parse(state.expires_at) - Date.now() + 50),
+        );
+      }
+      return false;
+    },
     queryFn: async () =>
       unwrapHubResult(
         await getPersonalAiHubAgentStatusFn({ data: { runtime } }),
       ),
   });
+
+  const checkCodexMutation = useMutation({
+    retry: false,
+    mutationFn: async () => unwrapHubResult(await checkPersonalAiHubCodexFn()),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: ["personal-ai-hub", "agent-status", "codex"],
+      }),
+  });
+  const codexStatus = statusQuery.data?.runtime_status;
+  const checkingCodex =
+    checkCodexMutation.isPending || codexStatus?.status === "checking";
 
   const messagesQuery = useQuery({
     retry: false,
@@ -166,6 +192,7 @@ function AgentChatPage() {
               setCompleted(null);
               mutation.reset();
               createSessionMutation.reset();
+              checkCodexMutation.reset();
             }}
           >
             <option value="opencode">opencode · DeepSeek API</option>
@@ -177,6 +204,43 @@ function AgentChatPage() {
             ? "Hub 独立会话；使用本机配置模型，首版支持只读项目任务。"
             : "使用本机 opencode，模型费用由 DeepSeek API 计费。"}
         </p>
+        {runtime === "codex" && (
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center justify-between gap-3">
+              <p role="status">
+                {checkingCodex
+                  ? "正在检查 Codex 连接…"
+                  : codexStatus?.status === "ready"
+                    ? "Codex 已连接"
+                    : codexStatus?.status === "stale"
+                      ? "Codex 连接状态已过期，请重新检查"
+                      : codexStatus?.status === "error"
+                        ? "Codex 检查失败"
+                        : "Codex 连接尚未验证"}
+              </p>
+              <button
+                type="button"
+                disabled={checkingCodex}
+                onClick={() => checkCodexMutation.mutate()}
+                className="border border-border/40 px-3 py-2 text-xs disabled:opacity-50"
+              >
+                检查 Codex 连接
+              </button>
+            </div>
+            {codexStatus?.status === "error" && (
+              <p role="alert" className="text-destructive text-xs">
+                {String(codexStatus.error.message)} [
+                {String(codexStatus.error.reason)},{" "}
+                {String(codexStatus.check_id)}]
+              </p>
+            )}
+            {checkCodexMutation.error && (
+              <p role="alert" className="text-destructive text-xs">
+                {checkCodexMutation.error.message}
+              </p>
+            )}
+          </div>
+        )}
         <label>
           知识检索
           <select
@@ -248,19 +312,25 @@ function AgentChatPage() {
             <span className="text-xs font-mono uppercase tracking-widest">
               model
             </span>
-            <select
-              disabled={runtime === "codex" || mutation.isPending}
-              value={model}
-              onChange={(event) =>
-                setModel(
-                  event.target.value as "deepseek-flash" | "deepseek-v4-pro",
-                )
-              }
-              className="w-full border border-border/40 bg-background p-3 text-sm outline-none focus:border-foreground/70"
-            >
-              <option value="deepseek-flash">deepseek-flash</option>
-              <option value="deepseek-v4-pro">deepseek-v4-pro</option>
-            </select>
+            {runtime === "codex" ? (
+              <output className="block border border-border/40 bg-muted/20 p-3 text-sm">
+                使用本机 Codex 配置
+              </output>
+            ) : (
+              <select
+                disabled={mutation.isPending}
+                value={model}
+                onChange={(event) =>
+                  setModel(
+                    event.target.value as "deepseek-flash" | "deepseek-v4-pro",
+                  )
+                }
+                className="w-full border border-border/40 bg-background p-3 text-sm outline-none focus:border-foreground/70"
+              >
+                <option value="deepseek-flash">deepseek-flash</option>
+                <option value="deepseek-v4-pro">deepseek-v4-pro</option>
+              </select>
+            )}
           </label>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-3">

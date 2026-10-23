@@ -45,6 +45,10 @@ export const getPersonalAiHubAgentStatusFn = createServerFn()
     PersonalAiHubService.getAgentStatus(context, data.runtime),
   );
 
+export const checkPersonalAiHubCodexFn = createServerFn({ method: "POST" })
+  .middleware([adminMiddleware])
+  .handler(({ context }) => PersonalAiHubService.checkCodexConnection(context));
+
 export const createPersonalAiHubAgentSessionFn = createServerFn({
   method: "POST",
 })

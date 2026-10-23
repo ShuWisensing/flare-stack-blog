@@ -88,9 +88,53 @@ export const AgentMessagesResponseSchema = z.object({
   items: z.array(z.record(z.string(), z.any())),
 });
 
-export const AgentStatusResponseSchema = z.object({
-  runtime: z.enum(["opencode", "codex"]),
-  runtime_status: z.record(z.string(), z.any()),
+const CodexRuntimeStatusSchema = z
+  .object({
+    status: z.enum(["unverified", "checking", "ready", "stale", "error"]),
+    check_id: z.string().trim().min(1).nullable(),
+    checked_at: z.string().datetime({ offset: true }).nullable(),
+    expires_at: z.string().datetime({ offset: true }).nullable(),
+    workspace: z.string().optional(),
+    mode: z.literal("read-only").optional(),
+    billing: z.literal("chatgpt").optional(),
+    timings: z.record(z.string(), z.number().nonnegative()).optional(),
+    error: z
+      .object({
+        reason: z.string().min(1),
+        message: z.string().min(1),
+        layer: z.literal("agent_runtime"),
+      })
+      .optional(),
+  })
+  .superRefine((state, context) => {
+    if (
+      (state.status !== "unverified" && !state.check_id) ||
+      (state.status === "error" && !state.error) ||
+      ((state.status === "ready" || state.status === "stale") &&
+        (!state.checked_at || !state.expires_at))
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Codex 状态快照缺少对应状态的字段。",
+      });
+    }
+  });
+
+export const AgentStatusResponseSchema = z.discriminatedUnion("runtime", [
+  z.object({
+    runtime: z.literal("opencode"),
+    runtime_status: z.record(z.string(), z.any()),
+  }),
+  z.object({
+    runtime: z.literal("codex"),
+    runtime_status: CodexRuntimeStatusSchema,
+  }),
+]);
+
+export const CodexCheckResponseSchema = z.object({
+  runtime: z.literal("codex"),
+  check_id: z.string().trim().min(1),
+  runtime_status: CodexRuntimeStatusSchema,
 });
 
 export type HubQueryInput = z.input<typeof HubQueryInputSchema>;

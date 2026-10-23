@@ -6,6 +6,7 @@ import {
   AgentSessionResponseSchema,
   AgentSessionsResponseSchema,
   AgentStatusResponseSchema,
+  CodexCheckResponseSchema,
   type HubQueryInput,
   HubQueryResponseSchema,
   HubSourcesResponseSchema,
@@ -68,12 +69,24 @@ const reasons: Record<string, string> = {
   LOCAL_MODEL_NOT_READY: "本地模型或 CUDA 尚未就绪。",
   AGENT_RUNTIME_NOT_READY: "所选 Runtime 未就绪。",
   CODEX_AUTH_UNAVAILABLE: "Codex 登录不可用。",
+  CODEX_AUTH_TIMEOUT: "Codex 连接或登录检查超时，请重新检查；未提交任务。",
+  WORKSPACE_NOT_REGISTERED: "未找到已登记的工作区或项目目录。",
+  WORKSPACE_PATH_UNAVAILABLE: "工作区目录不存在或不可访问，请在本机检查。",
+  WORKSPACE_CONFIG_CHANGED: "工作区目录绑定已变化，请核验本机配置。",
+  WORKSPACE_CONFIG_INVALID: "本机工作区登记文件缺失或格式有误。",
+  CONVERSATION_NOT_FOUND: "聊天或所属记录不存在。",
+  CONVERSATION_BUSY: "此聊天有未完成或结果未知的请求，请先核验当前请求。",
+  REQUEST_ID_CONFLICT: "请求编号已用于不同内容，未重复执行或覆盖旧记录。",
+  HUB_UPGRADE_REQUIRED:
+    "Hub 接口或聊天数据库版本不匹配，请核验后端版本和数据目录。",
   RUNTIME_SESSION_MISMATCH: "会话与当前 Runtime 或目录不匹配。",
   MODEL_CONFIG_MISSING: "模型配置缺失。",
   MODEL_AUTH_FAILED: "DeepSeek 鉴权失败，请检查本机系统环境变量 DEEPSEEK。",
   MODEL_RATE_LIMITED: "DeepSeek 额度或请求频率受到限制。",
   MODEL_REQUEST_FAILED: "DeepSeek 请求失败，请检查本机模型配置和上游服务。",
   HUB_TIMEOUT: "请求超时；Agent 任务可能仍在运行，请先刷新会话。",
+  HUB_UPSTREAM_TIMEOUT:
+    "博客等待 Hub 上游超时，尚未取得可识别的本地错误；请按请求编号检查链路。",
   INTERNAL_ERROR: "本地服务内部错误。",
   AGENT_EXECUTION_FAILED: "Agent 执行失败。",
   AGENT_EXECUTION_UNKNOWN:
@@ -135,9 +148,20 @@ async function hubFetch<T>(
           ? "HUB_UNAUTHORIZED"
           : response.status === 422
             ? "HUB_INVALID_REQUEST"
-            : "HUB_UPSTREAM_ERROR";
+            : response.status === 504
+              ? "HUB_UPSTREAM_TIMEOUT"
+              : "HUB_UPSTREAM_ERROR";
       let layer = "blog_proxy";
-      if (response.headers.get("Content-Type")?.includes("application/json")) {
+      const contentType = response.headers
+        .get("Content-Type")
+        ?.split(";")[0]
+        .trim()
+        .toLowerCase();
+      const isJson =
+        contentType === "application/json" ||
+        (contentType?.startsWith("application/") &&
+          contentType.endsWith("+json"));
+      if (isJson) {
         const body: unknown = await response.json().catch(() => null);
         const parsed = z
           .object({
@@ -160,6 +184,21 @@ async function hubFetch<T>(
           layer = parsed.data.error.layer;
         }
       }
+      const upstreamRequestId = response.headers.get("X-Hub-Request-Id");
+      console.error(
+        JSON.stringify({
+          message: "hub upstream request failed",
+          request_id: requestId,
+          upstream_status: response.status,
+          content_type: contentType,
+          reason,
+          layer,
+          ...(upstreamRequestId &&
+          /^[A-Za-z0-9-]{1,64}$/.test(upstreamRequestId)
+            ? { upstream_request_id: upstreamRequestId }
+            : {}),
+        }),
+      );
       return fail(
         reason,
         reasons[reason] ??
@@ -260,6 +299,14 @@ export const getAgentStatus = (
     "/agent/status?runtime=" + runtime,
     AgentStatusResponseSchema,
     { method: "GET" },
+  );
+export const checkCodexConnection = (context: HubRequestContext) =>
+  hubFetch(
+    context,
+    "/hub/runtimes/codex/checks",
+    CodexCheckResponseSchema,
+    { method: "POST" },
+    5000,
   );
 export const createAgentSession = (
   context: HubRequestContext,

@@ -14,6 +14,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const api = vi.hoisted(() => ({
   listPersonalAiHubAgentSessionsFn: vi.fn(),
   getPersonalAiHubAgentStatusFn: vi.fn(),
+  checkPersonalAiHubCodexFn: vi.fn(),
   listPersonalAiHubAgentMessagesFn: vi.fn(),
   createPersonalAiHubAgentSessionFn: vi.fn(),
   sendPersonalAiHubAgentChatMessageFn: vi.fn(),
@@ -28,6 +29,7 @@ import { Route } from "@/routes/admin/personal-ai-hub/agent-chat";
 afterEach(() => {
   cleanup();
   vi.resetAllMocks();
+  vi.useRealTimers();
 });
 function showPage() {
   const client = new QueryClient({
@@ -42,6 +44,117 @@ function showPage() {
   );
 }
 describe("Agent Chat user flow", () => {
+  it("clears a previous Codex check error when changing runtime", async () => {
+    readySessions();
+    api.checkPersonalAiHubCodexFn.mockResolvedValue({
+      data: null,
+      error: {
+        reason: "HUB_NETWORK_ERROR",
+        layer: "blog_proxy",
+        requestId: "request-a",
+        message: "Previous Codex check failed",
+      },
+    });
+    showPage();
+    await screen.findByText("Session A");
+    fireEvent.change(screen.getByLabelText("执行器"), {
+      target: { value: "codex" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "检查 Codex 连接" }));
+    await screen.findByText(/Previous Codex check failed/);
+    fireEvent.change(screen.getByLabelText("执行器"), {
+      target: { value: "opencode" },
+    });
+    fireEvent.change(screen.getByLabelText("执行器"), {
+      target: { value: "codex" },
+    });
+    expect(screen.queryByText(/Previous Codex check failed/)).toBeNull();
+  });
+
+  it("refreshes an expired Codex snapshot without starting another probe", async () => {
+    vi.useFakeTimers();
+    readySessions();
+    const expires = Date.now() + 1000;
+    api.getPersonalAiHubAgentStatusFn.mockImplementation(async ({ data }) => ({
+      data: {
+        runtime: data.runtime,
+        runtime_status:
+          data.runtime === "codex"
+            ? {
+                status: Date.now() < expires ? "ready" : "stale",
+                check_id: "check-a",
+                checked_at: new Date(expires - 60000).toISOString(),
+                expires_at: new Date(expires).toISOString(),
+              }
+            : {},
+      },
+      error: null,
+    }));
+    showPage();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    fireEvent.change(screen.getByLabelText("执行器"), {
+      target: { value: "codex" },
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getByText("Codex 已连接")).toBeTruthy();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1100);
+    });
+    expect(screen.getByText("Codex 连接状态已过期，请重新检查")).toBeTruthy();
+    expect(api.checkPersonalAiHubCodexFn).not.toHaveBeenCalled();
+  });
+
+  it("checks Codex explicitly and polls status without submitting a task", async () => {
+    readySessions();
+    let checked = false;
+    api.getPersonalAiHubAgentStatusFn.mockImplementation(async ({ data }) => ({
+      data: {
+        runtime: data.runtime,
+        runtime_status: { status: checked ? "ready" : "unverified" },
+      },
+      error: null,
+    }));
+    api.checkPersonalAiHubCodexFn.mockImplementation(async () => {
+      checked = true;
+      return {
+        data: {
+          runtime: "codex",
+          check_id: "check-a",
+          runtime_status: { status: "checking" },
+        },
+        error: null,
+      };
+    });
+    showPage();
+    await screen.findByText("Session A");
+    fireEvent.change(screen.getByLabelText("执行器"), {
+      target: { value: "codex" },
+    });
+    fireEvent.click(
+      await screen.findByRole("button", { name: "检查 Codex 连接" }),
+    );
+    await screen.findByText("Codex 已连接");
+    expect(api.checkPersonalAiHubCodexFn).toHaveBeenCalledTimes(1);
+    expect(api.sendPersonalAiHubAgentChatMessageFn).not.toHaveBeenCalled();
+  });
+
+  it("shows the local configuration instead of a DeepSeek selector for Codex", async () => {
+    readySessions();
+    showPage();
+    await screen.findByText("Session A");
+    fireEvent.change(screen.getByLabelText("执行器"), {
+      target: { value: "codex" },
+    });
+    expect(screen.queryByRole("option", { name: "deepseek-flash" })).toBeNull();
+    expect(screen.getByLabelText("model").textContent).toContain(
+      "使用本机 Codex 配置",
+    );
+  });
+
   it("refreshes the selected session messages after a request failure", async () => {
     readySessions();
     showPage();
