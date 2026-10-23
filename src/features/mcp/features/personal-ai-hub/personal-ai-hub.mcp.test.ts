@@ -6,6 +6,17 @@ import { wikiSourcesListTool } from "./tools/wiki-sources-list.tool";
 import { wikiStatusTool } from "./tools/wiki-status.tool";
 
 describe("personal ai hub mcp tools", () => {
+  it("returns isError for an unreachable Hub", async () => {
+    const result = await wikiStatusTool.handler({
+      env: {
+        PERSONAL_AI_HUB_API_URL: "https://hub.test",
+        PERSONAL_AI_HUB_API_TOKEN: "private",
+      },
+      fetch: async () => new Response("private", { status: 502 }),
+    } as unknown as McpToolContext);
+    expect(result.isError).toBe(true);
+    expect(JSON.stringify(result)).not.toContain("private");
+  });
   it("registers wiki_query as a read-only Personal AI Hub tool", () => {
     expect(mcpPersonalAiHubTools).toContain(wikiQueryTool);
     expect(wikiQueryTool.name).toBe("wiki_query");
@@ -34,7 +45,7 @@ describe("personal ai hub mcp tools", () => {
       {
         question: "Fresnel Zone",
         answerMode: "llm_rag",
-        llmModel: "deepseek-v4-flash",
+        llmModel: "deepseek-flash",
         retrievalMode: "hybrid",
         topK: 8,
         rerankMode: "off",
@@ -59,15 +70,17 @@ describe("personal ai hub mcp tools", () => {
       }),
     );
     expect(result.isError).not.toBe(true);
-    expect("structuredContent" in result ? result.structuredContent : null).toEqual(
-      expect.objectContaining({ answer: "matched answer" }),
-    );
+    expect(
+      "structuredContent" in result ? result.structuredContent : null,
+    ).toEqual(expect.objectContaining({ answer: "matched answer" }));
   });
 
   it("forwards wiki_status and wiki_sources_list to local Hub APIs", async () => {
     const fetchMock = vi.fn(async (url: string) => {
       if (url.endsWith("/kb/status")) {
-        return new Response(JSON.stringify({ status: "ready" }), { status: 200 });
+        return new Response(JSON.stringify({ status: "ready" }), {
+          status: 200,
+        });
       }
       return new Response(JSON.stringify({ items: [{ source_id: "src_1" }] }), {
         status: 200,
@@ -86,7 +99,11 @@ describe("personal ai hub mcp tools", () => {
 
     expect(status.isError).not.toBe(true);
     expect(sources.isError).not.toBe(true);
-    expect("structuredContent" in status ? status.structuredContent : null).toEqual({ status: "ready" });
-    expect("structuredContent" in sources ? sources.structuredContent : null).toEqual({ items: [{ source_id: "src_1" }] });
+    expect(
+      "structuredContent" in status ? status.structuredContent : null,
+    ).toEqual({ status: "ready" });
+    expect(
+      "structuredContent" in sources ? sources.structuredContent : null,
+    ).toEqual({ items: [{ source_id: "src_1" }] });
   });
 });

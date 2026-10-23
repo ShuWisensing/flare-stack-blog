@@ -29,14 +29,21 @@ export const wikiQueryTool = defineMcpTool({
       topK: args.topK,
     });
 
+    if (result.error)
+      return {
+        isError: true,
+        content: [
+          { type: "text" as const, text: JSON.stringify(result.error) },
+        ],
+      };
     return {
       content: [
         {
           type: "text",
-          text: JSON.stringify(result, null, 2),
+          text: JSON.stringify(result.data, null, 2),
         },
       ],
-      structuredContent: result,
+      structuredContent: result.data,
     };
   },
 });

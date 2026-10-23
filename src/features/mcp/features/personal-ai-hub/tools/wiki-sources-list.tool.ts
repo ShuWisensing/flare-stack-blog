@@ -12,9 +12,16 @@ export const wikiSourcesListTool = defineMcpTool({
   requiredScopes: WIKI_SOURCES_LIST_REQUIRED_SCOPES,
   async handler(context) {
     const result = await listKnowledgeSources(context);
+    if (result.error)
+      return {
+        isError: true,
+        content: [
+          { type: "text" as const, text: JSON.stringify(result.error) },
+        ],
+      };
     return {
-      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-      structuredContent: result,
+      content: [{ type: "text", text: JSON.stringify(result.data, null, 2) }],
+      structuredContent: result.data,
     };
   },
 });

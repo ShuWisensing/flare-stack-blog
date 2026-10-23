@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import {
   AgentChatInputSchema,
+  AgentRuntimeInputSchema,
   AgentSessionCreateInputSchema,
   AgentSessionMessagesInputSchema,
   HubQueryInputSchema,
@@ -32,11 +33,17 @@ export const sendPersonalAiHubAgentChatMessageFn = createServerFn({
 
 export const listPersonalAiHubAgentSessionsFn = createServerFn()
   .middleware([adminMiddleware])
-  .handler(({ context }) => PersonalAiHubService.listAgentSessions(context));
+  .inputValidator(AgentRuntimeInputSchema)
+  .handler(({ context, data }) =>
+    PersonalAiHubService.listAgentSessions(context, data.runtime),
+  );
 
 export const getPersonalAiHubAgentStatusFn = createServerFn()
   .middleware([adminMiddleware])
-  .handler(({ context }) => PersonalAiHubService.getAgentStatus(context));
+  .inputValidator(AgentRuntimeInputSchema)
+  .handler(({ context, data }) =>
+    PersonalAiHubService.getAgentStatus(context, data.runtime),
+  );
 
 export const createPersonalAiHubAgentSessionFn = createServerFn({
   method: "POST",
@@ -44,7 +51,7 @@ export const createPersonalAiHubAgentSessionFn = createServerFn({
   .middleware([adminMiddleware])
   .inputValidator(AgentSessionCreateInputSchema)
   .handler(({ data, context }) =>
-    PersonalAiHubService.createAgentSession(context, data.title),
+    PersonalAiHubService.createAgentSession(context, data.title, data.runtime),
   );
 
 export const listPersonalAiHubAgentMessagesFn = createServerFn({
@@ -53,5 +60,9 @@ export const listPersonalAiHubAgentMessagesFn = createServerFn({
   .middleware([adminMiddleware])
   .inputValidator(AgentSessionMessagesInputSchema)
   .handler(({ data, context }) =>
-    PersonalAiHubService.listAgentMessages(context, data.sessionId),
+    PersonalAiHubService.listAgentMessages(
+      context,
+      data.sessionId,
+      data.runtime,
+    ),
   );

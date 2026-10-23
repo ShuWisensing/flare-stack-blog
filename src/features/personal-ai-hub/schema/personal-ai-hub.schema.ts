@@ -4,11 +4,11 @@ export const HubQueryInputSchema = z.object({
   question: z.string().trim().min(1, "问题不能为空"),
   answerMode: z.enum(["local", "llm_rag"]).default("local"),
   llmModel: z
-    .enum(["qwen-max", "qwen-plus", "qwen3.6-plus", "deepseek-v4-flash", "deepseek-v4-pro"])
-    .default("deepseek-v4-flash"),
+    .enum(["deepseek-flash", "deepseek-v4-pro"])
+    .default("deepseek-flash"),
   retrievalMode: z.enum(["bm25", "vector", "hybrid", "local"]).default("bm25"),
   topK: z.number().int().min(1).max(50).default(8),
-  rerankMode: z.string().default("off"),
+  rerankMode: z.enum(["off", "local"]).default("off"),
   rerankTopK: z.number().int().min(1).max(50).default(8),
   bm25TopK: z.number().int().min(1).max(100).optional(),
   vectorTopK: z.number().int().min(1).max(100).optional(),
@@ -34,11 +34,18 @@ export const HubSourcesResponseSchema = z.object({
   items: z.array(z.record(z.string(), z.any())),
 });
 
+export const AgentRuntimeInputSchema = z.object({
+  runtime: z.enum(["opencode", "codex"]),
+});
 export const AgentChatInputSchema = z.object({
+  runtime: z.enum(["opencode", "codex"]),
   sessionId: z.string().trim().min(1, "opencode session id 不能为空"),
   question: z.string().trim().min(1, "问题不能为空"),
-  model: z.enum(["deepseek-v4-flash", "deepseek-v4-pro"]).default("deepseek-v4-flash"),
-  retrievalMode: z.enum(["bm25", "vector", "hybrid", "local"]).default("hybrid"),
+  model: z.string().trim().min(1).optional(),
+  rerankMode: z.enum(["off", "local"]).default("local"),
+  retrievalMode: z
+    .enum(["bm25", "vector", "hybrid", "local"])
+    .default("hybrid"),
   topK: z.number().int().min(1).max(50).default(8),
   bm25TopK: z.number().int().min(1).max(100).optional(),
   vectorTopK: z.number().int().min(1).max(100).optional(),
@@ -46,7 +53,9 @@ export const AgentChatInputSchema = z.object({
 });
 
 export const AgentChatResponseSchema = z.object({
-  opencode_result: z.record(z.string(), z.any()),
+  runtime: z.enum(["opencode", "codex"]),
+  runtime_result: z.record(z.string(), z.any()),
+  opencode_result: z.record(z.string(), z.any()).optional(),
   citations: z.array(z.record(z.string(), z.any())),
   recall_items: z.array(z.record(z.string(), z.any())),
   timings: z.record(z.string(), z.any()),
@@ -54,20 +63,25 @@ export const AgentChatResponseSchema = z.object({
   run_record: z.record(z.string(), z.any()).optional(),
 });
 
-export const AgentSessionCreateInputSchema = z.object({
+export const AgentSessionCreateInputSchema = AgentRuntimeInputSchema.extend({
   title: z.string().trim().min(1, "会话标题不能为空"),
 });
 
-export const AgentSessionMessagesInputSchema = z.object({
+export const AgentSessionMessagesInputSchema = AgentRuntimeInputSchema.extend({
   sessionId: z.string().trim().min(1, "opencode session id 不能为空"),
 });
 
+const AgentSessionSchema = z.object({
+  id: z.string().trim().min(1),
+  title: z.string().optional(),
+});
+
 export const AgentSessionsResponseSchema = z.object({
-  items: z.array(z.record(z.string(), z.any())),
+  items: z.array(AgentSessionSchema),
 });
 
 export const AgentSessionResponseSchema = z.object({
-  session: z.record(z.string(), z.any()),
+  session: AgentSessionSchema,
 });
 
 export const AgentMessagesResponseSchema = z.object({
@@ -75,7 +89,8 @@ export const AgentMessagesResponseSchema = z.object({
 });
 
 export const AgentStatusResponseSchema = z.object({
-  opencode: z.record(z.string(), z.any()),
+  runtime: z.enum(["opencode", "codex"]),
+  runtime_status: z.record(z.string(), z.any()),
 });
 
 export type HubQueryInput = z.input<typeof HubQueryInputSchema>;
@@ -84,9 +99,35 @@ export type HubStatusResponse = z.infer<typeof HubStatusResponseSchema>;
 export type HubSourcesResponse = z.infer<typeof HubSourcesResponseSchema>;
 export type AgentChatInput = z.input<typeof AgentChatInputSchema>;
 export type AgentChatResponse = z.infer<typeof AgentChatResponseSchema>;
-export type AgentSessionCreateInput = z.input<typeof AgentSessionCreateInputSchema>;
-export type AgentSessionMessagesInput = z.input<typeof AgentSessionMessagesInputSchema>;
+export type AgentSessionCreateInput = z.input<
+  typeof AgentSessionCreateInputSchema
+>;
+export type AgentSessionMessagesInput = z.input<
+  typeof AgentSessionMessagesInputSchema
+>;
 export type AgentSessionsResponse = z.infer<typeof AgentSessionsResponseSchema>;
 export type AgentSessionResponse = z.infer<typeof AgentSessionResponseSchema>;
 export type AgentMessagesResponse = z.infer<typeof AgentMessagesResponseSchema>;
 export type AgentStatusResponse = z.infer<typeof AgentStatusResponseSchema>;
+
+export type AgentRuntime = "opencode" | "codex";
+export type HubError = {
+  reason: string;
+  layer: string;
+  message: string;
+  requestId: string;
+  upstreamStatus?: number;
+};
+export type HubResult<T> = import("@/lib/errors/error").Result<T, HubError>;
+export function unwrapHubResult<T>(result: HubResult<T>): T {
+  if (result.error)
+    throw new Error(
+      result.error.message +
+        " [" +
+        result.error.reason +
+        ", " +
+        result.error.requestId +
+        "]",
+    );
+  return result.data;
+}
