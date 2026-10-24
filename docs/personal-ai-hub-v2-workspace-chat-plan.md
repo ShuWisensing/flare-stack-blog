@@ -1,12 +1,12 @@
 # Personal AI Hub V2：工作区、聊天与知识图谱实施计划
 
-> 日期：2026-10-23。状态：阶段 0 代码已实现，真实 Codex 双轮验收待完成；阶段 1 的 SQLite、工作区/会话管理 API 和旧记录只读清点已实现，写入导入与 Runtime 接入仍待开发。每阶段先验证失败测试，再实现、复测和记录结果。使用当前 E:\blog / E:\wiki，不创建新工作区或默认启用子代理。
+> 日期：2026-10-23，实施更新：2026-10-24。阶段 2–4 代码已实现；阶段 5 已完成隔离回归、真实旧记录备份与生产导入，新版后端已启动，博客待部署。真实模型双轮与管理员页面验收、实体/概念真实数据门槛仍独立保留。每阶段按 RED/GREEN 验证；使用 E:\blog / E:\wiki，不创建新工作区或默认启用子代理。
 
 **目标：** 把现有调试表单改成日常可用的知识库与项目聊天入口，补充 Obsidian 风格的知识关系浏览，保留 Wiki、Codex、opencode 的已有能力，解决 Codex 未稳定接通的问题。
 
 **架构：** 博客负责管理员认证、代理和聊天展示；E:\wiki 负责知识检索、SQLite 会话数据和 Runtime 适配。复用原生 Agent 的推理、工具和上下文，不开发另一套 Agent 记忆系统。
 
-**技术栈：** 现有 React / TanStack Start / Query / Zod / Vitest，FastAPI / SQLite / Pytest / HTTPX，本地 Qwen3 embedding / BGE reranker、DeepSeek API、Codex app-server、opencode serve。图谱计划新增浏览器端 Cytoscape.js；本轮尚未安装依赖。首批不增加云端存储或第三种 Agent。
+**技术栈：** React / TanStack Start / Query / Zod / Vitest，FastAPI / SQLite / Pytest / HTTPX，本地 Qwen3 embedding / BGE reranker、DeepSeek API、Codex app-server、opencode serve。图谱采用 Cytoscape.js 与 CoSE Worker；Markdown 采用 react-markdown / remark-gfm。不增加云端存储或第三种 Agent。
 
 ## 1. 本轮依据与当前真实状态
 
@@ -101,7 +101,7 @@
 
 现有文章 ContentRenderer 接受 Tiptap JSON，不能直接接收 answer 字符串。新增聊天 Markdown 渲染层，支持段落、标题、列表、引用、表格、链接及代码块复制。
 
-使用已有 marked 解析 Token，再通过 React 元素渲染；原始 HTML 不执行。链接限制协议；本地资料通过受保护的引用 ID 读取，不开放任意 path/file:// 文件接口。远程图片首批不自动加载。
+实现采用 react-markdown / remark-gfm 的 AST 与 React 元素渲染，以统一正文和内部 Wiki 链接处理；原始 HTML 不执行。链接限制协议；本地资料通过受保护的引用 ID 读取，不开放任意 path/file:// 文件接口。远程图片首批不自动加载。代码保留完整缩进、支持复制，超过 8000 字符默认折叠，复制失败显式提示。
 
 把“实际在答案中引用的资料”和“送入模型的召回候选”分开。正文的 [n] 必须对应本轮合法引用；候选不自动标成答案依据。无效编号显示可核验性问题，不伪造来源。
 
@@ -325,14 +325,15 @@ CREATE INDEX messages_conversation_seq
 | PATCH /hub/conversations/{id} | title 或 archived=true/false | 元数据；归档/恢复不删除历史，不改执行器或目录 |
 | GET /hub/conversations/{id} | id | 元数据、当前未终态 turn |
 | GET /hub/conversations/{id}/messages | before_seq、limit<=50 | 规范化消息与引用摘要 |
+| GET /hub/conversations/{id}/requests/{request_id} | 原 client_request_id | 只找回已接受请求，不提交新任务；未接受返回 404 |
 | POST /hub/conversations/{id}/turns | 下方 turn 输入 | 202 + turn_id；幂等重复返回已有 turn |
-| GET /hub/turns/{id} | id | 执行状态、消息 ID、安全错误 |
+| GET /hub/turns/{id} | id；显式 verify_native=true | 默认仅查 SQLite；显式核验 unknown 时只读原生历史，不重新执行 |
 | GET /hub/turns/{id}/details | id | 按需读取的诊断/召回/工具摘要 |
 | GET /hub/messages/{id}/citations/{ordinal} | 已保存引用 ID | 可核验的引用快照，不接受任意路径 |
 | GET /hub/runtimes | 工作区 ID | Runtime 状态快照与检查时间 |
 | POST /hub/runtimes/{runtime}/checks | 工作区 ID | 202 + check_id，执行合并的只读探测 |
 | GET /hub/runtimes/{runtime}/models | 工作区 ID | 该 Runtime 的模型目录/已配置模型 |
-| GET /kb/sources | 现有接口 | 资料列表；V2 补足分页/搜索契约 |
+| GET /kb/sources | 现有接口保留 | MCP 旧列表不变；V2 资料库复用 graph/search 的 source 类型过滤、分页与 revision |
 | GET /kb/sources/{id}/preview | 已登记资料 ID | 有界的只读预览与元数据 |
 | GET /kb/graph/status | scope=knowledge 或 evidence | 图谱版本、真实节点/边计数、实体/概念覆盖与数据问题 |
 | GET /kb/graph | scope、筛选、center_id、depth、revision、数量上限 | 有界节点与边、实际返回数、匹配总数、clipped |
@@ -359,8 +360,10 @@ CREATE INDEX messages_conversation_seq
 - Wiki 的知识模式必须 enabled=true；助手说明是独立意图，不因此转成外部通用问答。Agent 可以由用户明确关闭知识注入，界面显示本轮选择。
 - runtime、cwd 来自会话与已验证工作区，不允许在此输入中覆盖。
 - 相同 conversation + client_request_id + 相同输入返回原 turn，不再次调用 Runtime/LLM；相同 ID 不同输入返回 REQUEST_ID_CONFLICT。
+- 同一进程内相同 queued turn 只排队一次；SQLite claim 仍负责唯一执行。全局最多 8 个未终态请求（包括 unknown），超过返回 HUB_BUSY，不无限积累后台作业。
 - 异步接受后，界面每 1–2 秒查询执行状态，完成后读取消息。轮询只读取状态，不重发执行。
 - 刷新后通过会话元数据中的未终态 turn 恢复观察；提交响应丢失时先核对 request ID，不直接新建另一任务。
+- 会话元数据返回最近 V2 turn 的 last_settings；旧导入不推断不存在的设置。提交的型号与原生实际返回型号分别显示在本轮详情。
 - 首批仍保留 Wiki 40 秒、Agent 65 秒的本地任务期限。短轮询解决浏览器请求和任务生命周期耦合，延长任务期限另行评估。
 
 ```json
@@ -458,7 +461,7 @@ CREATE INDEX messages_conversation_seq
 
 视觉按第 3.5 节执行，验收桌面与手机、浅色与深色，以及空库/孤立节点/中文长标题。300 节点、900 边在本机实测拖动和缩放，目标稳定达到 30fps；记录实际设备和瓶颈，超出预算继续收紧展示范围，不能以隐藏截断换取通过。检查重复进入视图后的 Canvas / Worker / 事件监听释放。
 
-交互参考 [Obsidian 官方 Graph view](https://obsidian.md/help/plugins/graph) 的全局/局部关系浏览；技术依据为 [Cytoscape.js 官方文档](https://js.cytoscape.org/) 与[布局说明](https://blog.js.cytoscape.org/2020/05/11/layouts/)。这些是本项目的选型与设计，尚未实现或完成性能验证。
+交互参考 [Obsidian 官方 Graph view](https://obsidian.md/help/plugins/graph)；技术依据为 [Cytoscape.js 官方文档](https://js.cytoscape.org/) 与[布局说明](https://blog.js.cytoscape.org/2020/05/11/layouts/)。实现已落地。300 节点/900 边隔离 Canvas 实测 Worker 布局约 2.793 秒；当前自动化浏览器的无操作 rAF 基线也只有约 1fps，不能据此认定真实拖动达到或未达到 30fps，此项保留实际浏览器验收。视图返回复用已保存坐标与视口，尺寸变化保持图中心，最多保留 20 个视图，均不含正文存储。
 
 #### 7.2.6 权限、错误与版本一致性
 
@@ -569,7 +572,7 @@ Store 接口约定：`ConversationStore(db_path)`；`create_workspace(root_key, 
 - [x] 先测试两个工作区、多聊天、分页顺序、目录缺失/越界/大小写/junction、事务失败不留半条消息。Windows 真实 Junction 改目标后会拒绝旧绑定。
 - [x] 同一请求 ID 两次提交只生成一个 turn，换内容必须冲突；并发 seq 不重复。同会话忙或 unknown 时明确报 busy。
 - [x] 实现 schema、参数化 SQL 与目录登记；新增 API 的 token 依赖复用统一认证。目录、会话重命名与归档/恢复均保持绑定不变。
-- [ ] 临时副本演练导入、重复导入、缺失元数据、旧 pending 保留；生成计数差异，不操作生产旧库。
+- [x] 临时副本演练导入、重复导入、缺失元数据、旧 pending 保留；生成计数差异，不操作生产旧库。2026-10-24 真实副本及生产新库均导入 1 工作区 / 1 聊天 / 2 消息，原来源校验不变。
 - [x] 重启测试实例后按同会话 ID 读回消息；仅数据层/管理 API 已完成，真实问答和原生 Runtime 尚未写入此新库。
 
 旧记录准备状态：LegacyImporter.inspect 仅只读清点四个明确的 Hub 文件，去重两份 JSONL、报告冲突/缺失元数据/未归属目录，并保留 Codex pending 原始字段。真实库只读清点为 1 条 opencode 会话、1 次完成运行，归属 wiki-project；源文件校验和未变，新生产 hub.sqlite 未创建。副本写入导入、SQLite backup 与切换演练尚未实现，上述导入复选框继续保留未完成。
@@ -593,11 +596,11 @@ def test_same_operation_creates_only_one_turn(tmp_path):
 
 **代码范围：** 两个现有 Runtime、native_messages.py、coordinator.py、conversations API。
 
-- [ ] 原生协议替身先断言目录：blog 会话每次 start/resume/send 使用 E:\blog，wiki 项目使用 E:\wiki；交叉会话请求拒绝。
-- [ ] Codex 的 legacy/paginated、空页面非空历史、分页游标、失联 pending 均写回归。opencode 不把跨项目 session.list 当 Hub 聊天目录。
-- [ ] 规范化用户原问题与助手最终文本；对工具/事件生成摘要，正文不泄漏整段知识注入提示。
-- [ ] 接受 turn 的事务先于执行，返回 202；后台结果完成入库。原生提交意图先入库，未知状态保持原 ID，不能在重启后重放。
-- [ ] 刷新只 GET 同一个 turn；切会话不把旧请求结果塞进新会话；进程退出明确记录状态。
+- [x] 原生协议替身先断言目录：blog 会话每次 start/resume/send 使用 E:\blog，wiki 项目使用 E:\wiki；交叉会话请求拒绝。
+- [x] Codex 的 legacy/paginated、空页面非空历史、分页游标、失联 pending 均写回归。opencode 不把跨项目 session.list 当 Hub 聊天目录。
+- [x] 规范化用户原问题与助手最终文本；对工具/事件生成摘要，正文不泄漏整段知识注入提示。
+- [x] 接受 turn 的事务先于执行，返回 202；后台结果完成入库。原生提交意图先入库，未知状态保持原 ID，不能在重启后重放。
+- [x] 刷新只 GET 同一个 turn；切会话不把旧请求结果塞进新会话；进程退出明确记录状态。
 
 ```python
 def test_native_tool_events_are_not_chat_messages():
@@ -622,11 +625,11 @@ def test_native_tool_events_are_not_chat_messages():
 
 **代码范围：** chat/conversation_service.py、chat/service.py、llm/deepseek.py、retrieval/relevance.py、conversations API 与已有知识 API。
 
-- [ ] 先固定截图里的“hello 介绍一下自己”：输出助手能力说明，不进行无关资料召回。
-- [ ] 新增有答案、无答案、寒暄、复合请求、指代不明、跨会话相同追问等本地标注题。BM25 与重排模式分别校准，不选一个未经评估的通用阈值。
-- [ ] 最近上下文在同会话内读取；必要改写与最终回答共用 40 秒预算。新聊天接口不读写单轮答案缓存。
-- [ ] 资料搜索/预览按已登记源 ID 读取，校验路径与快照；只做浏览，不开放任意文件内容接口。
-- [ ] 保存消息和引用后关闭重开，第二轮能正确理解上一轮实体；无证据时不以模型常识伪装知识库内容。
+- [x] 先固定截图里的“hello 介绍一下自己”：输出助手能力说明，不进行无关资料召回。
+- [x] 新增有答案、无答案、寒暄、复合请求、指代不明、跨会话相同追问等本地标注题。BM25 与重排模式分别校准，不选一个未经评估的通用阈值。
+- [x] 最近上下文在同会话内读取；必要改写与最终回答共用 40 秒预算。新聊天接口不读写单轮答案缓存。
+- [x] 资料搜索/预览按已登记源 ID 读取，校验路径与快照；只做浏览，不开放任意文件内容接口。
+- [x] 隔离用例验证保存/重开后的历史、同会话指代及跨会话隔离；无证据明确拒答。真实 DeepSeek 连续两轮答案仍在阶段 5 手动验收。
 
 ```python
 def test_assistant_intro_does_not_search_knowledge():
@@ -640,7 +643,7 @@ def test_assistant_intro_does_not_search_knowledge():
 
 `WikiConversationService(search=...)` 的 `describe_or_route(text)` 对明确助手说明返回该结果，其它问题返回 knowledge_query 或 clarification，不能把任意短句都归入寒暄。
 
-测试新文件：`E:\wiki\tests\test_wiki_conversations.py`、`test_relevance_gate.py`、`test_source_previews.py`；更新 `test_search_and_chat.py` 与 DeepSeek 隔离测试。
+测试新文件：`E:\wiki\tests\test_wiki_conversations.py`、`test_relevance_gate.py`、`test_knowledge_graph_api.py`；更新 `test_search_and_chat.py` 与 DeepSeek 隔离测试。
 
 **阶段通过条件：** 同会话追问有效、跨会话隔离；空知识/低相关明确说明；没有云 embedding/rerank 或额外 provider；引用可核验。
 
@@ -650,13 +653,13 @@ def test_assistant_intro_does_not_search_knowledge():
 
 **代码范围：** knowledge_graph/models.py、service.py、wiki_links.py、api/knowledge_graph.py 及 server.py 路由注册；博客补相应 schema / service / admin API 的隔离契约测试。
 
-- [ ] 先写最小失败测试：Wiki 为空但资料存在时，knowledge 返回真实空态，evidence 返回外键关系，两个范围不自动互换；源库文件不存在时明确报错且不创建数据库。
-- [ ] 在临时库构造概念 A、实体 B、资料 C 及已保存的显式链接，验证稳定 ID、一/两跳入出链、来源依据、唯一别名、同名歧义与未解析链接。代码块内的示例链接不生成边。
-- [ ] 验证节点正文读取、分页、版本变化、坏 ID、路径越界、文件缺失、孤儿关联和权限错误；记录数据质量，不以空结果掩盖失败。
-- [ ] 实现有界图与全范围搜索；测试查询上限、可见/总数、clipped、中心保留和结果次序。
-- [ ] 当前库做只读对照，记录实体/概念覆盖为 0 的事实。另有真实数据时先确认其接入契约；本阶段不自动生成实体、不重建检索索引、不创建 graph.sqlite。
+- [x] 先写最小失败测试：Wiki 为空但资料存在时，knowledge 返回真实空态，evidence 返回外键关系，两个范围不自动互换；源库文件不存在时明确报错且不创建数据库。
+- [x] 在临时库构造概念 A、实体 B、资料 C 及已保存的显式链接，验证稳定 ID、一/两跳入出链、来源依据、唯一别名、同名歧义与未解析链接。代码块内的示例链接不生成边。
+- [x] 验证节点正文读取、分页、版本变化、坏 ID、路径越界、文件缺失、孤儿关联和权限错误；记录数据质量，不以空结果掩盖失败。
+- [x] 实现有界图与全范围搜索；测试查询上限、可见/总数、clipped、中心保留和结果次序。
+- [x] 当前库做只读对照，记录实体/概念覆盖为 0 的事实。另有真实数据时先确认其接入契约；本阶段不自动生成实体、不重建检索索引、不创建 graph.sqlite。
 
-测试文件：`E:\wiki\tests\test_knowledge_graph.py`、`test_knowledge_graph_api.py`；博客新增 `E:\blog\src\features\personal-ai-hub\wiki-graph.service.test.ts`。只在临时库使用夹具，不调用模型或网络。
+测试文件：`E:\wiki\tests\test_knowledge_graph.py`、`test_knowledge_graph_api.py`；博客新增 `E:\blog\src\features\personal-ai-hub\hub-chat.service.test.ts`。只在临时库使用夹具，不调用模型或网络。
 
 验证命令：
 
@@ -665,7 +668,7 @@ Set-Location E:\wiki
 .\.venv\Scripts\python.exe -m pytest -q tests/test_knowledge_graph.py tests/test_knowledge_graph_api.py
 
 Set-Location E:\blog
-bun run test:node src/features/personal-ai-hub/wiki-graph.service.test.ts
+bun run test:node src/features/personal-ai-hub/hub-chat.service.test.ts
 ```
 
 **阶段通过条件：** 只读图谱和内容 API 契约通过，资料图有真实数据，语义图空态和隔离样例通过。实体/概念真实验收仍单列 HUB-35，不能在本阶段误记为已完成。
@@ -674,14 +677,14 @@ bun run test:node src/features/personal-ai-hub/wiki-graph.service.test.ts
 
 **代码范围：** 第 8 节的博客新组件/契约/代理/Query；两个现有 Hub route 及 Hub 专属后台布局分支。
 
-- [ ] 先写用户行为测试：刷新恢复、目录/聊天切换、IME、双击发送、归档、旧异步结果不串会话、轮询不调用 POST。
-- [ ] 实现消息列表、紧凑输入框、工作区侧栏；Wiki 左栏是知识库与聊天，不强行套项目目录。
-- [ ] 实现安全 Markdown；原始 HTML、javascript/data 链接、超长代码块、中文表格均有测试。
-- [ ] 引用/工具/诊断默认收起且有独立滚动区域；默认页不出现 SESSION MESSAGES、TIMINGS、EXECUTION 的 JSON 面板。
-- [ ] 只为 Hub 页面移除大 padding、收窄限制，支持收起博客导航；其它后台页面做布局回归。
-- [ ] Wiki 增加“对话 / 知识图谱 / 资料库”，实现画布、搜索/筛选、知识/资料范围、局部图、节点预览及只读阅读页，按第 3.5 / 7.2 节验收。
-- [ ] 按客户端动态加载 Cytoscape.js 与布局 Worker；真实空态、离线、布局失败与部分图分别显示，禁止用演示数据补图。测试卸载清理、连续选节点、内部链接、URL 刷新与后退。
-- [ ] 桌面 1440×900 与手机 390×844 人工查看：输入框可用、正文可读、开详情不撑成长页面、侧栏不挤满屏幕。
+- [x] 先写用户行为测试：刷新恢复、目录/聊天切换、IME、双击发送、归档、旧异步结果不串会话、轮询不调用 POST。
+- [x] 实现消息列表、紧凑输入框、工作区侧栏；Wiki 左栏是知识库与聊天，不强行套项目目录。
+- [x] 实现安全 Markdown；原始 HTML、javascript/data 链接、超长代码块、中文表格均有测试。
+- [x] 引用/工具/诊断默认收起且有独立滚动区域；默认页不出现 SESSION MESSAGES、TIMINGS、EXECUTION 的 JSON 面板。
+- [x] 只为 Hub 页面移除大 padding、收窄限制，支持收起博客导航；其它后台页面做布局回归。
+- [x] Wiki 增加“对话 / 知识图谱 / 资料库”，实现画布、搜索/筛选、知识/资料范围、局部图、节点预览及只读阅读页，按第 3.5 / 7.2 节验收。
+- [x] 按客户端动态加载 Cytoscape.js 与布局 Worker；真实空态、离线、布局失败与部分图分别显示，禁止用演示数据补图。测试卸载清理、连续选节点、内部链接、URL 刷新与后退。
+- [x] 桌面 1440×900 与手机 390×844 人工查看：输入框可用、正文可读、开详情不撑成长页面、侧栏不挤满屏幕。
 
 ```typescript
 it("Markdown 正文使用段落和强调元素", () => {
@@ -699,7 +702,7 @@ it("Markdown 正文使用段落和强调元素", () => {
 
 ### 阶段 5：切换、回归和真实验收
 
-- [ ] 先完成隔离测试、类型与构建，保留数据库备份及导入清单；不在自动测试中调用真实模型或公网 Agent。
+- [x] 完成隔离测试、类型与构建，保留数据库备份及导入清单；自动测试未调用真实模型或公网 Agent。
 - [ ] 本地短维护窗口完成已演练迁移，明确拒绝旧 Agent 写接口并提示刷新；后端先提供新 API，再部署博客新界面。
 - [ ] 用户手动验证 Wiki 两轮追问、资料查询、无答案、关闭重开；opencode/Codex 各自新建独立聊天并在正确项目读一个普通文件。
 - [ ] 图谱验证搜索未绘制节点、展开资料、预览/阅读/反链/返回、刷新与移动端操作；真实实体/概念关系不存在时，只验收资料图与空态，HUB-35 继续保持待补数据，不能宣布语义图谱完整交付。
@@ -730,4 +733,4 @@ Workers 默认 5 秒首次 SELF.fetch 的已知环境问题保留；需要时用
 - completed：只加入能复核的能力；Codex 以实际双轮任务验收为准，SQLite 以重启恢复为准；图谱分别记录资料关系可用和真实实体/概念可阅读，不能把测试样例当作生产数据。
 - roadmap：此计划取代旧路线中“先做复杂记忆管理”的优先级；其它远期能力保留为可选，不阻塞上述六阶段。
 
-当前建议先执行阶段 0，再做 SQLite 与工作区；界面的静态样式可在阶段 4 实现前依据第 3 节复核，但不把静态截图当成后端功能完成。
+2026-10-24 当前执行到阶段 5；阶段 2–4 的勾选表示代码及隔离验证通过，真实付费模型任务、管理员端验收和语义数据门槛按独立未勾选项继续记录。实际入口与模块以源码及 completed 文档为准。

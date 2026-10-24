@@ -18,7 +18,7 @@ type HubEnv = {
   PERSONAL_AI_HUB_API_URL?: string;
   PERSONAL_AI_HUB_API_TOKEN?: string;
 };
-type HubRequestContext = { env: HubEnv; fetch?: typeof fetch };
+export type HubRequestContext = { env: HubEnv; fetch?: typeof fetch };
 class HubConfigError extends Error {
   constructor(
     public reason: string,
@@ -97,8 +97,15 @@ const reasons: Record<string, string> = {
   AGENT_BUSY: "所选执行器正在处理任务，请稍后再试。",
   INDEX_GENERATION_MISMATCH: "索引版本或内容校验失败，请重建所选索引。",
   LOCAL_PARSER_NOT_READY: "本地文档解析或 OCR 未就绪。",
+  GRAPH_DATA_UNAVAILABLE: "知识数据库不可读或结构不兼容。",
+  GRAPH_NODE_NOT_FOUND: "当前范围没有此知识节点。",
+  GRAPH_CONTENT_UNAVAILABLE: "已登记正文缺失或不可读取，请核查本机文件。",
+  GRAPH_SNAPSHOT_CHANGED: "知识内容已经变化，请刷新图谱后继续浏览。",
+  RELEVANCE_NOT_READY: "相关性校准缺失或与当前索引不匹配，请在本机校准。",
+  HUB_RESTARTED: "本机服务已重启，此请求没有自动重发。",
+  HUB_BUSY: "本机未完成请求已达上限，请先处理或核验现有请求。",
 };
-async function hubFetch<T>(
+export async function hubFetch<T>(
   context: HubRequestContext,
   path: string,
   schema: z.ZodType<T>,
@@ -172,6 +179,7 @@ async function hubFetch<T>(
                 "retrieval",
                 "agent_runtime",
                 "blog_proxy",
+                "knowledge_graph",
               ]),
             }),
           })

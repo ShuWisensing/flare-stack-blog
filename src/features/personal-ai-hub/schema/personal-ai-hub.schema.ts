@@ -88,7 +88,7 @@ export const AgentMessagesResponseSchema = z.object({
   items: z.array(z.record(z.string(), z.any())),
 });
 
-const CodexRuntimeStatusSchema = z
+export const CodexRuntimeStatusSchema = z
   .object({
     status: z.enum(["unverified", "checking", "ready", "stale", "error"]),
     check_id: z.string().trim().min(1).nullable(),
@@ -165,13 +165,19 @@ export type HubError = {
 export type HubResult<T> = import("@/lib/errors/error").Result<T, HubError>;
 export function unwrapHubResult<T>(result: HubResult<T>): T {
   if (result.error)
-    throw new Error(
-      result.error.message +
-        " [" +
-        result.error.reason +
-        ", " +
-        result.error.requestId +
-        "]",
+    throw Object.assign(
+      new Error(
+        result.error.message +
+          " [" +
+          result.error.reason +
+          ", " +
+          result.error.requestId +
+          "]",
+      ),
+      {
+        reason: result.error.reason,
+        upstreamStatus: result.error.upstreamStatus,
+      },
     );
   return result.data;
 }
