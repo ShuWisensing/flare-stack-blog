@@ -318,7 +318,8 @@ V2 已增加 Wiki SQLite 多轮、工作区/聊天、图谱与资料阅读。因
 - 后端保持现有实例：FastAPI 8000、opencode 4096 的监听 PID 与四条登记身份逐一匹配，均正常；没有执行重复启动、停止或安装系统服务。Codex 通过 Hub 按需创建 stdio 子进程，不另开公网端口。
 - 本机及 Tunnel 的带 token /health 均返回 V2/online，/kb/status 均 ready。真实元数据为资料 21、摘要 21、片段 5237、资源 68、Wiki 页 0。
 - 通过公网地址实际调用博客 service/Zod：Codex、opencode 显式只读检查均 ready；模型目录分别 7 个（本机配置 gpt-6.1-sol）、2 个（deepseek-flash）。资料图返回 42 节点、21 关系。没有创建原生聊天或消耗模型推理额度。
-- 源码已推送的业务提交为 608d73f 与 2aca5ad，前次[部署已成功](https://github.com/ShuWisensing/flare-stack-blog/actions/runs/40083036705)。本轮审查记录推送后，对最新 main 再运行既有部署流程，最终结果在进行中文档补记。
+- 源码已推送的业务提交为 608d73f 与 2aca5ad；本轮审查提交 de1b694 已推送。对该版最新 main 执行既有部署流程，[GitHub Actions 40087770531 已成功](https://github.com/ShuWisensing/flare-stack-blog/actions/runs/40087770531)，部署与 CDN 清理均完成；后续仅补充本结果文档，业务源码一致。
+- 部署后 18:56–18:57 复测：首页 HTTP 200，两个 Hub 后台 URL 匿名均 307 转 /login；本机和 Tunnel 健康均 V2/online，opencode global/health 为 healthy=true。现有两个后端继续运行，无需用户重新启动后测试。
 - HUB-56 的历史退出原因仍未确认；本次同一批进程已跨上次会话继续运行，本轮未复现退出，不能把历史问题当作当前服务离线。
 
 ### 留给用户的真实功能验收
