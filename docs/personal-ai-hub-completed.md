@@ -18,6 +18,7 @@
 - 真实只读探测：新版工作区 Codex/opencode 均返回 ready；原生目录分别读取 7 个 Codex 模型（配置 gpt-6.1-sol）、2 个 opencode 模型（deepseek-flash）。公网匿名读取聊天/图谱为 401，旧 Agent 创建接口为 409/HUB_UPGRADE_REQUIRED。未创建原生聊天或提交任务。
 - 图谱性能最终复核：Windows Chrome 155、1440×900、前台焦点，300 节点/900 边 Worker 约 2.087 秒，平移约 55fps、缩放约 60fps，P95 帧间隔 17ms（各 2.5 秒采样）。早先焦点状态下 1fps 的记录不能当作真实性能结论；本机自动化场景通过，真实触屏仍待用户验收。
 - 博客 608d73f 已推送 main 并[自动部署成功](https://github.com/ShuWisensing/flare-stack-blog/actions/runs/40082059888)；线上首页实测 HTTP 200，两个 Hub URL 规范化后匿名都转 /login。
+- HUB-55 断网恢复补丁 2aca5ad 已推送并[自动部署成功](https://github.com/ShuWisensing/flare-stack-blog/actions/runs/40083036705)。HUB-56 后台进程退出已单独记录；17:46 重启后本机及公网再次 HTTP 200 / V2，8000/4096 有监听，退出原因仍待对照。
 - 未发起真实付费模型任务。Wiki 两轮答案、Codex/opencode 项目任务及管理员端验收仍保留，真实实体/概念数据门槛未通过。代码完成与这些人工验收分开记录，旧版历史说明以下保留。
 
 > 2026-10-23 二次审查后的修复：审查发现的 16 项问题已修改代码并补充隔离回归，修复状态见[审查报告第 8 节](personal-ai-hub-v1-code-review-2026-10-23.md#8-审查后的代码修复与验证)。自动测试覆盖不代表真实 Agent、公网与已部署博客已经验收。

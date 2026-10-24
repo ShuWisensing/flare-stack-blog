@@ -14,7 +14,8 @@
 - 新版只读探测中两 Runtime 均 ready；Codex 原生目录 7 个模型、配置 gpt-6.1-sol；opencode 2 个模型、deepseek-flash。公网无 token 读取为 401，旧 Agent 写接口为 409/HUB_UPGRADE_REQUIRED；这些没有提交真实模型任务。
 - 最终自动验证：后端 266 项、博客 Node 201 项、Workers 199 项（CLI 20 秒）、类型、lint、生产构建通过。界面、数据和迁移代码均已落地；博客 608d73f 已推送并[自动部署成功](https://github.com/ShuWisensing/flare-stack-blog/actions/runs/40082059888)，线上首页 HTTP 200，两 Hub 入口匿名转登录。当前没有通过真实模型任务，不能据此宣称阶段 5 人工验收结束。
 - 图谱最终前台焦点采样：300 节点/900 边，Worker 2.087 秒、平移 55fps、缩放 60fps；此前 1fps 的焦点状态影响已排除，本机自动化场景达到目标。真实触屏/管理员端仍待操作验收。
-- HUB-55 断网未送达恢复补丁已通过 RED/GREEN 和 Node 全量 201 项；仅显式重交完整的同 UUID 原请求，核对失败不自动重发。补丁接续发布中。
+- HUB-55 断网未送达恢复补丁已通过 RED/GREEN 和 Node 全量 201 项；仅显式重交完整的同 UUID 原请求，核对失败不自动重发。补丁 2aca5ad 已[自动部署成功](https://github.com/ShuWisensing/flare-stack-blog/actions/runs/40083036705)。
+- HUB-56：收尾曾发现工具启动的四个 Hub 后台进程均已退出，本机无监听、公网 502；日志无业务崩溃堆栈。已按原参数重启，2026-10-24 17:46 本机及 Tunnel 均复测 HTTP 200 / V2，8000/4096 有监听；退出原因尚未确认，需与普通 PowerShell 启动做生命周期对照。
 - 保留现有 AGENTS.md 与其它用户改动，不并入业务提交。真实 Wiki 多轮答案、Codex/opencode 双轮及线上管理员端验收仍由用户实际提问确认，不使用付费调用替代该验收。
 
 ## 2026-10-23 当前焦点：V2 阶段 0 验证与阶段 1 底座
