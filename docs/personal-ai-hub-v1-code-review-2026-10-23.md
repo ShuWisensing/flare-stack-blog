@@ -2,7 +2,7 @@
 
 日期：2026-10-23。范围：`E:\blog` 与 `E:\wiki`。本轮只审查、隔离复现和更新文档，**未修改业务代码，也未修复下列问题**。
 
-> 上句及第 1–7 节保留审查当时的证据；用户随后授权修改代码，当前修复状态以文末第 8 节为准，不能再把原始“待修复”统计视为当前状态。
+> 上句及第 1–7 节保留审查当时的证据；第 8–9 节为随后修复的历史记录。2026-10-24 已重新逐项核对，当前结论以文末第 10 节为准，不能把原始“待修复”或“未部署”统计视为当前状态。
 
 ## 1. 审查结论
 
@@ -281,3 +281,50 @@ Set-Location E:\wiki
 用户手动启动后，本地和公网 Tunnel 的带 token 健康检查、知识库状态、opencode 状态均为 HTTP 200，活动 generation ready。没有据此认定真实 Agent 任务、模型额度或博客管理员代理已经验收。
 
 Codex 状态发现 HUB-27：CLI 覆盖键中带引号的工具名触发 invalid transport，本地子进程初始化退出。改为顶层 TOML 内联表禁用 MCP / 插件后，两项新增失败回归转绿，后端全量 176 项通过；独立 app-server 初始化、ChatGPT account/read 成功，未发送模型任务。用户已启动的 Hub 不会热加载本次修复，须重启后再验证。博客本轮由 main 推送触发自动部署，发布结果以 GitHub Actions 为准。
+
+## 10. 2026-10-24 逐项复核与测试准备
+
+### 结论
+
+本报告列出的 **16 项代码修复和 FIX-01–03 三项关联修复均已实现**，本轮重新检查调用链并复跑现有测试通过。没有为了重新发布而改动已完成的业务代码。这里的完成指代码及隔离验证；管理员页面、真实模型任务和 MCP OAuth 的人工验收仍按下方清单保留，不计为已经通过。
+
+| 原编号 | 本次核对结果 | 当前验证依据 |
+| --- | --- | --- |
+| STD-01 | 已完成；带 token 的代理拒绝重定向 | personal-ai-hub.service.test.ts |
+| STD-02 | 已完成；V2 以会话独立状态、固定请求归属和卸载隔离取代旧页的共享 result，不把 A 的结果写进 B | hub-chat-shell.test.ts、agent-chat-page.test.ts |
+| STD-03 | 已完成；旧 Refresh 表单已由 V2 GET 观察、终态读取消息及显式核验原任务取代，不重发执行 | hub-chat-shell.test.ts、test_turn_coordinator.py |
+| STD-04 | 已完成；旧会话响应仍严格检查 id，新接口使用完整工作区/会话/turn 契约 | personal-ai-hub.service.test.ts、hub-chat.service.test.ts |
+| STD-05 | 已完成；opencode 同时核验 global/health 与 session/status | test_opencode_runtime.py；本轮真实只读检查 ready |
+| SPEC-01 | 已完成；V1 缓存只复用原始文本精确匹配、正反馈和真实证据；V2 多轮不使用单轮答案缓存 | test_query_cache_and_tuning.py、test_wiki_conversations.py |
+| SPEC-02 | 已完成；唯一文件名与独占创建，事务失败只清理本次新文件 | test_url_and_personal_wiki.py |
+| SPEC-03 | 已完成；Gradio 重建失败显式报错，不自动激活 BM25-only | test_gradio_app.py |
+| SPEC-04 | 已完成；最终引用对应真实来源坐标及不可变快照 | test_local_ingest.py；上一轮 generation 全量引用核验记录保留 |
+| SPEC-05 | 已完成；确认后重建，失败明确知识已保存/索引待更新 | test_gradio_app.py |
+| SPEC-06 | 已完成；空白 PDF 页与扫描/图片页区分，保留页号 | test_local_ingest.py |
+| SPEC-07 | 已完成；异常按类型处理，ASGI 边界及日志帧位置不输出原异常值 | test_fastapi_hub_api.py |
+| SPEC-08 | 已完成；HTTP、RPC 事件与返回实施总期限，清理受管进程；V2 接受与观察分离 | test_opencode_runtime.py、test_codex_runtime.py、test_conversation_api.py |
+| SPEC-09 | 已完成；发送后失联保持 unknown，重启/刷新不重放；未送达恢复也只显式重交同 UUID 原输入 | test_fastapi_hub_api.py、test_turn_coordinator.py、hub-chat-shell.test.ts |
+| SPEC-10 | 已完成；提交前保存原生映射/意图，按原任务核验；Codex 显式支持 legacy/paginated 历史 | test_codex_runtime.py、test_native_messages.py、test_turn_coordinator.py |
+| SPEC-11 | 已完成；诊断/Codex 独立于 DEEPSEEK，opencode 和 Wiki 问答各自按需检查 | test_hub_scripts.py；本轮两个 Runtime 的原生模型目录可读取 |
+| FIX-01 | 已完成；内容指纹、固定 generation 与实际内容校验 | test_query_cache_and_tuning.py、test_vector_bm25_retrieval.py |
+| FIX-02 | 已完成；诊断兼容无 Response 网络错误，带 token 探针拒绝跳转 | test_hub_scripts.py |
+| FIX-03 | 已完成；DeepSeek 异步 SDK 受总期限约束，禁用自动重试 | test_deepseek_model.py |
+
+V2 已增加 Wiki SQLite 多轮、工作区/聊天、图谱与资料阅读。因此第 8 节的“Wiki 仍为单轮”和“未提交/未部署”是当时的历史状态；当前产品范围以 [V2 计划](personal-ai-hub-v2-workspace-chat-plan.md) 为准。桌面历史同步、网页写入审批、OCR、Harness 仍不属于本版。
+
+### 本轮验证与运行状态
+
+- 后端现有全量：266 项通过，75.69 秒；博客 Node 全量：201 项通过，53.24 秒。本轮未改业务代码，Workers 沿用同版已通过的 199 项（CLI 20 秒），不把旧记录伪称本轮重跑。
+- 后端保持现有实例：FastAPI 8000、opencode 4096 的监听 PID 与四条登记身份逐一匹配，均正常；没有执行重复启动、停止或安装系统服务。Codex 通过 Hub 按需创建 stdio 子进程，不另开公网端口。
+- 本机及 Tunnel 的带 token /health 均返回 V2/online，/kb/status 均 ready。真实元数据为资料 21、摘要 21、片段 5237、资源 68、Wiki 页 0。
+- 通过公网地址实际调用博客 service/Zod：Codex、opencode 显式只读检查均 ready；模型目录分别 7 个（本机配置 gpt-6.1-sol）、2 个（deepseek-flash）。资料图返回 42 节点、21 关系。没有创建原生聊天或消耗模型推理额度。
+- 源码已推送的业务提交为 608d73f 与 2aca5ad，前次[部署已成功](https://github.com/ShuWisensing/flare-stack-blog/actions/runs/40083036705)。本轮审查记录推送后，对最新 main 再运行既有部署流程，最终结果在进行中文档补记。
+- HUB-56 的历史退出原因仍未确认；本次同一批进程已跨上次会话继续运行，本轮未复现退出，不能把历史问题当作当前服务离线。
+
+### 留给用户的真实功能验收
+
+- [ ] 登录博客后，Wiki 新建聊天、连续追问两轮、无答案问题、刷新后读取历史。
+- [ ] Agent Chat 分别选择 Codex/opencode，在正确工作区新建独立聊天、读一个普通项目文件并继续追问；Codex 首版仍为只读。
+- [ ] 测试运行中刷新、超时后的原任务核验、聊天切换、改名/归档与引用打开。
+- [ ] 查看资料图、资料正文及返回导航；实体/概念数据目前为 0，HUB-35 保留，不把资料结构图当作完整语义知识网络。
+- [ ] 如使用博客 MCP，验收实际客户端 OAuth 授权和知识查询。协议隔离测试通过不能代替客户端登录验收。
