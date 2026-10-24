@@ -114,6 +114,86 @@ afterEach(() => {
   sessionStorage.clear();
 });
 
+it("explicitly resubmits the identical request only after its original ID was not found", async () => {
+  ready();
+  api.submitHubTurnFn.mockRejectedValueOnce(new Error("connection lost"));
+  api.getHubRequestFn.mockResolvedValue({
+    data: null,
+    error: {
+      reason: "CONVERSATION_NOT_FOUND",
+      upstreamStatus: 404,
+      message: "原请求不存在",
+      layer: "hub",
+      requestId: "lookup",
+    },
+  });
+  api.getHubRequestFn.mockResolvedValueOnce({
+    data: null,
+    error: {
+      reason: "HUB_TIMEOUT",
+      upstreamStatus: 504,
+      message: "核对超时",
+      layer: "hub",
+      requestId: "lookup-timeout",
+    },
+  });
+  const accepted = {
+    turn_id: "same-turn",
+    conversation_id: "a",
+    state: "completed",
+    client_request_id: "original",
+    error_reason: null,
+    updated_at: "now",
+  };
+  api.submitHubTurnFn.mockResolvedValueOnce(ok(accepted));
+  api.getHubTurnFn.mockResolvedValue(ok(accepted));
+  show();
+  await screen.findByText("回答 a");
+  fireEvent.change(screen.getByRole("textbox", { name: "发送消息" }), {
+    target: { value: "  original\n    code\n" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "发送" }));
+  await screen.findByRole("button", { name: "核对原请求" });
+  expect(screen.queryByRole("button", { name: "重新提交原请求" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "核对原请求" }));
+  await screen.findByText(/核对超时/);
+  expect(screen.queryByRole("button", { name: "重新提交原请求" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "核对原请求" }));
+  fireEvent.click(
+    await screen.findByRole("button", { name: "重新提交原请求" }),
+  );
+  await waitFor(() => expect(api.submitHubTurnFn).toHaveBeenCalledTimes(2));
+  expect(api.submitHubTurnFn.mock.calls[1][0].data).toEqual(
+    api.submitHubTurnFn.mock.calls[0][0].data,
+  );
+  expect(api.getHubRequestFn.mock.calls[0][0].data.client_request_id).toBe(
+    api.submitHubTurnFn.mock.calls[0][0].data.input.client_request_id,
+  );
+});
+
+it("never reconstructs an original request body from an ID restored after reload", async () => {
+  ready();
+  sessionStorage.setItem(
+    "hub-request:a",
+    "7a1d0c69-e707-46aa-b026-1fd5f6a9034c",
+  );
+  api.getHubRequestFn.mockResolvedValue({
+    data: null,
+    error: {
+      reason: "CONVERSATION_NOT_FOUND",
+      upstreamStatus: 404,
+      message: "原请求不存在",
+      layer: "hub",
+      requestId: "lookup",
+    },
+  });
+  show();
+  fireEvent.click(await screen.findByRole("button", { name: "核对原请求" }));
+  await screen.findByText("当前页面未保留原请求内容，请继续核对，或新建聊天。");
+  expect(screen.queryByRole("button", { name: "重新提交原请求" })).toBeNull();
+  expect(api.submitHubTurnFn).not.toHaveBeenCalled();
+});
+
 it("reads saved Markdown messages without the old diagnostic JSON panels", async () => {
   ready();
   show();

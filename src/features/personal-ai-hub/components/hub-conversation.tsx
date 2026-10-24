@@ -339,6 +339,7 @@ export function HubConversationView({
         setTurnId(result.turn_id);
         setQuestion("");
         setUncertain(false);
+        pending.current = null;
         sessionStorage.removeItem("hub-request:" + chat.id);
       }
     },
@@ -372,6 +373,7 @@ export function HubConversationView({
       setTurnId(data.turn_id);
       setUncertain(false);
       setQuestion("");
+      pending.current = null;
       sessionStorage.removeItem("hub-request:" + chat.id);
       void messages.refetch();
     },
@@ -405,6 +407,29 @@ export function HubConversationView({
     Boolean(turnId && turn.isPending);
   const modelMissing =
     chat.runtime !== "codex" && answerMode === "chat" && model === null;
+  const requestNotFound = Boolean(
+    recover.error &&
+      "reason" in recover.error &&
+      recover.error.reason === "CONVERSATION_NOT_FOUND" &&
+      "upstreamStatus" in recover.error &&
+      recover.error.upstreamStatus === 404,
+  );
+  function resubmitOriginal() {
+    const original = pending.current;
+    if (
+      !uncertain ||
+      !requestNotFound ||
+      !original ||
+      submission.current ||
+      recover.isPending ||
+      send.isPending ||
+      chat.archived_at
+    )
+      return;
+    submission.current = true;
+    recover.reset();
+    send.mutate(original);
+  }
   function submit() {
     if (
       submission.current ||
@@ -563,9 +588,25 @@ export function HubConversationView({
             >
               核对原请求
             </button>
+            {requestNotFound &&
+              (pending.current ? (
+                <button
+                  type="button"
+                  disabled={
+                    recover.isPending ||
+                    send.isPending ||
+                    Boolean(chat.archived_at)
+                  }
+                  onClick={resubmitOriginal}
+                >
+                  重新提交原请求
+                </button>
+              ) : (
+                <p>当前页面未保留原请求内容，请继续核对，或新建聊天。</p>
+              ))}
           </div>
         )}
-        <HubErrorNotice error={send.error ?? recover.error} />
+        <HubErrorNotice error={recover.error ?? send.error} />
         <form
           className="hub-composer"
           onSubmit={(event) => {
