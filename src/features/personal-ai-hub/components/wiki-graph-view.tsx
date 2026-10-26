@@ -2,6 +2,7 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, BookOpen, Network, RefreshCw, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import * as Api from "../api/hub-chat.admin.api";
+import { nodePresentation } from "../graph-presentation";
 import type { HubGraphEdge } from "../schema/hub-chat.schema";
 import { unwrapHubResult } from "../schema/personal-ai-hub.schema";
 import type { HubLocation, HubNavigation } from "./hub-app";
@@ -17,16 +18,9 @@ function useDebounced(value: string) {
   }, [value]);
   return settled;
 }
-const nodeTypes: Record<string, string> = {
-  source: "资料概况",
-  summary: "摘要",
-  chunk: "已解析片段",
-  asset: "资源提取文字",
-  concept: "概念",
-  entity: "实体",
-  method: "方法",
-  project: "项目",
-};
+const nodeTypes: Record<string, string> = Object.fromEntries(
+  Object.entries(nodePresentation).map(([kind, entry]) => [kind, entry.name]),
+);
 const relationTypes: Record<string, string> = {
   has_summary: "包含摘要",
   has_chunk: "包含片段",
@@ -83,12 +77,26 @@ function NodeReader({
     retry: false,
   });
   const text = content.data?.pages.map((page) => page.content).join("");
-  const displayText =
-    text !== undefined &&
-    first &&
-    text.split("\n")[0] === `# ${first.node.title}`
-      ? text.slice(text.indexOf("\n") + 1).trimStart()
+  const storedMarkdown =
+    first?.node.content_type === "wiki_markdown" ||
+    first?.node.content_type === "summary_markdown";
+  const header =
+    storedMarkdown && text
+      ? /^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/.exec(text)?.[0]
+      : undefined;
+  const incompleteHeader =
+    storedMarkdown && /^---\r?\n/.test(text ?? "") && !header;
+  const body = incompleteHeader
+    ? undefined
+    : header
+      ? text?.slice(header.length).trimStart()
       : text;
+  const displayText =
+    body !== undefined &&
+    first &&
+    body.split("\n")[0].trimEnd() === `# ${first.node.title}`
+      ? body.slice(body.indexOf("\n") + 1).trimStart()
+      : body;
   const neighbors = Array.from(
     new Map(
       detail.data?.pages
@@ -134,6 +142,9 @@ function NodeReader({
               已登记正文暂不可读，请在本机检查文件和目录。
             </p>
           )}
+          {incompleteHeader && (
+            <p className="hub-muted">知识页头尚未读取完整，请继续读取正文。</p>
+          )}
           {displayText !== undefined &&
             (plain ? (
               <div className="hub-user-text">
@@ -158,7 +169,13 @@ function NodeReader({
                 原始链接
               </a>
             )}
-          {preview && text && text.length > 1800 && (
+          {header && (
+            <details className="hub-node-metadata">
+              <summary>资料信息</summary>
+              <pre>{header}</pre>
+            </details>
+          )}
+          {preview && displayText && displayText.length > 1800 && (
             <p className="hub-muted">预览仅显示开头，完整内容请进入阅读页。</p>
           )}
           {!preview && content.hasNextPage && (
@@ -439,6 +456,25 @@ export function WikiGraphView({
         </>
       ) : (
         <>
+          <div className="hub-graph-legend" aria-label="节点类型说明">
+            <span className="hub-muted">节点类型</span>
+            {Object.entries(nodePresentation)
+              .filter(([kind]) =>
+                location.scope === "evidence"
+                  ? ["source", "summary", "chunk", "asset"].includes(kind)
+                  : !["summary", "chunk", "asset"].includes(kind),
+              )
+              .map(([kind, entry]) => (
+                <span key={kind} title={entry.description}>
+                  <i style={{ backgroundColor: entry.color }} />
+                  {entry.name}
+                  <small>
+                    {graph.data?.nodes.filter((node) => node.kind === kind)
+                      .length ?? 0}
+                  </small>
+                </span>
+              ))}
+          </div>
           <div className="hub-graph-toolbar">
             <Network size={16} />
             <select

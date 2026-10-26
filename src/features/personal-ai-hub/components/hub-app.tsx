@@ -18,7 +18,7 @@ import {
   Settings2,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import * as Api from "../api/hub-chat.admin.api";
 import type { HubConversation, HubWorkspace } from "../schema/hub-chat.schema";
 import { unwrapHubResult } from "../schema/personal-ai-hub.schema";
@@ -26,22 +26,45 @@ import { HubConversationView } from "./hub-conversation";
 import { HubErrorNotice } from "./hub-feedback";
 import { WikiGraphView } from "./wiki-graph-view";
 import "../hub.css";
+const HubKnowledgeManager = lazy(() =>
+  import("./hub-knowledge-manager").then((module) => ({
+    default: module.HubKnowledgeManager,
+  })),
+);
+const NativeHistoryPicker = lazy(() =>
+  import("./native-history-picker").then((module) => ({
+    default: module.NativeHistoryPicker,
+  })),
+);
+const HubCollectionSettings = lazy(() =>
+  import("./hub-collection-settings").then((module) => ({
+    default: module.HubCollectionSettings,
+  })),
+);
+const NativeProjectPicker = lazy(() =>
+  import("./native-project-picker").then((module) => ({
+    default: module.NativeProjectPicker,
+  })),
+);
 
 export type HubLocation = {
-  view: "chat" | "graph" | "sources" | "reader";
+  view: "chat" | "graph" | "sources" | "reader" | "review";
   scope: "knowledge" | "evidence";
   workspace?: string;
   chat?: string;
   node?: string;
+  runtime?: "codex" | "opencode";
 };
 export type HubNavigation = (location: HubLocation) => void;
 
 function WorkspaceGroup({
   workspace,
+  runtime,
   location,
   navigate,
 }: {
   workspace: HubWorkspace;
+  runtime: HubConversation["runtime"];
   location: HubLocation;
   navigate: HubNavigation;
 }) {
@@ -58,13 +81,13 @@ function WorkspaceGroup({
   });
   const active = location.workspace === workspace.id;
   const chats = useInfiniteQuery({
-    queryKey: ["hub-v2", "conversations", workspace.id],
+    queryKey: ["hub-v2", "conversations", workspace.id, runtime],
     enabled: active,
     initialPageParam: undefined as string | undefined,
     queryFn: async ({ pageParam }) =>
       unwrapHubResult(
         await Api.listHubConversationsFn({
-          data: { workspace_id: workspace.id, cursor: pageParam },
+          data: { workspace_id: workspace.id, cursor: pageParam, runtime },
         }),
       ),
     getNextPageParam: (page) => page.next_cursor ?? undefined,
@@ -174,16 +197,18 @@ function WorkspaceGroup({
 
 function ArchivedChats({
   workspaceId,
+  runtime,
   close,
   restore,
 }: {
   workspaceId: string;
+  runtime: HubConversation["runtime"];
   close: () => void;
   restore: (chat: HubConversation) => void;
 }) {
   const cache = useQueryClient();
   const chats = useInfiniteQuery({
-    queryKey: ["hub-v2", "archived", workspaceId],
+    queryKey: ["hub-v2", "archived", workspaceId, runtime],
     initialPageParam: undefined as string | undefined,
     queryFn: async ({ pageParam }) =>
       unwrapHubResult(
@@ -191,6 +216,7 @@ function ArchivedChats({
           data: {
             workspace_id: workspaceId,
             include_archived: true,
+            runtime,
             cursor: pageParam,
           },
         }),
@@ -271,6 +297,7 @@ function ProjectPicker({
   select: (workspace: HubWorkspace) => void;
 }) {
   const cache = useQueryClient();
+  const [discovering, setDiscovering] = useState(false);
   const roots = useQuery({
     queryKey: ["hub-v2", "roots"],
     queryFn: async () => unwrapHubResult(await Api.listHubRootsFn()),
@@ -290,6 +317,18 @@ function ProjectPicker({
       close();
     },
   });
+  if (discovering)
+    return (
+      <Suspense fallback={<p>正在打开项目目录…</p>}>
+        <NativeProjectPicker
+          close={() => setDiscovering(false)}
+          select={(workspace) => {
+            select(workspace);
+            close();
+          }}
+        />
+      </Suspense>
+    );
   return (
     <div
       className="hub-modal-backdrop"
@@ -312,6 +351,13 @@ function ProjectPicker({
         <p className="hub-muted">
           使用本机登记的目录。添加工作区不会把项目导入知识库。
         </p>
+        <button
+          type="button"
+          className="hub-native-open"
+          onClick={() => setDiscovering(true)}
+        >
+          从本机 Codex 发现项目
+        </button>
         {roots.data?.items.map((root) => (
           <button
             type="button"
@@ -418,6 +464,8 @@ export function HubApp({
   const [sidebarHidden, setSidebarHidden] = useState(false);
   const [adding, setAdding] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [nativePicker, setNativePicker] = useState(false);
+  const [collectionSettings, setCollectionSettings] = useState(false);
   const [runtime, setRuntime] = useState<"codex" | "opencode">("codex");
   const workspaces = useInfiniteQuery({
     queryKey: ["hub-v2", "workspaces", mode],
@@ -451,6 +499,13 @@ export function HubApp({
     retry: false,
   });
   const chat = current.data?.conversation;
+  const selectedRuntime =
+    mode === "wiki"
+      ? "wiki"
+      : (location.runtime ??
+        (chat?.runtime === "codex" || chat?.runtime === "opencode"
+          ? chat.runtime
+          : runtime));
   const create = useMutation({
     retry: false,
     mutationFn: async () => {
@@ -459,10 +514,12 @@ export function HubApp({
         await Api.createHubConversationFn({
           data: {
             workspace_id: currentWorkspace.id,
-            runtime: mode === "wiki" ? "wiki" : runtime,
+            runtime: selectedRuntime,
             title: "新对话",
             model_id:
-              mode === "agent" && runtime === "codex" ? null : "deepseek-flash",
+              mode === "agent" && selectedRuntime === "codex"
+                ? null
+                : "deepseek-flash",
           },
         }),
       );
@@ -489,7 +546,8 @@ export function HubApp({
   const workspaceMismatch =
     chat &&
     (chat.workspace_id !== location.workspace ||
-      (mode === "wiki") !== (chat.runtime === "wiki"));
+      (mode === "wiki") !== (chat.runtime === "wiki") ||
+      chat.runtime !== selectedRuntime);
   return (
     <div className="hub-app" data-sidebar-hidden={sidebarHidden}>
       {sidebarOpen && (
@@ -534,6 +592,7 @@ export function HubApp({
                 { view: "chat", label: "对话", Icon: MessageSquare },
                 { view: "graph", label: "知识图谱", Icon: Network },
                 { view: "sources", label: "资料库", Icon: Search },
+                { view: "review", label: "待确认知识", Icon: Brain },
               ] as const
             ).map(({ view, label, Icon }) => (
               <button
@@ -551,6 +610,30 @@ export function HubApp({
           </nav>
         )}
         <div className="hub-sidebar-scroll">
+          {mode === "agent" &&
+            selectedRuntime === "codex" &&
+            currentWorkspace && (
+              <button
+                type="button"
+                className="hub-native-open"
+                onClick={() => setCollectionSettings(true)}
+              >
+                <Brain size={16} />
+                日常聊天收集
+              </button>
+            )}
+          {mode === "agent" &&
+            selectedRuntime === "codex" &&
+            currentWorkspace && (
+              <button
+                type="button"
+                className="hub-native-open"
+                onClick={() => setNativePicker(true)}
+              >
+                <Folder size={16} />
+                接入本机 Codex 聊天
+              </button>
+            )}
           <div className="hub-section-label">
             {mode === "wiki" ? "聊天记录" : "工作区"}
             {mode === "agent" && (
@@ -568,6 +651,7 @@ export function HubApp({
             <WorkspaceGroup
               key={workspace.id}
               workspace={workspace}
+              runtime={selectedRuntime}
               location={location}
               navigate={changeLocation}
             />
@@ -622,9 +706,12 @@ export function HubApp({
           <div className="hub-heading">
             <h1>
               {mode === "wiki" && location.view !== "chat"
-                ? { graph: "知识图谱", sources: "资料库", reader: "知识阅读" }[
-                    location.view
-                  ]
+                ? {
+                    graph: "知识图谱",
+                    sources: "资料库",
+                    reader: "知识阅读",
+                    review: "待确认知识",
+                  }[location.view]
                 : (chat?.title ??
                   (mode === "wiki" ? "我的知识库" : "Agent Chat"))}
             </h1>
@@ -634,15 +721,35 @@ export function HubApp({
                 : (currentWorkspace?.name ?? "选择项目工作区")}
             </span>
           </div>
+          {mode === "wiki" && location.view !== "sources" && (
+            <button
+              type="button"
+              onClick={() =>
+                navigate({ ...location, view: "sources", node: undefined })
+              }
+            >
+              <Plus size={16} />
+              添加与整理资料
+            </button>
+          )}
           {mode === "agent" && (
             <label className="hub-runtime-picker">
               新对话执行器
               <select
                 aria-label="新对话执行器"
-                value={runtime}
-                onChange={(event) =>
-                  setRuntime(event.target.value as "codex" | "opencode")
-                }
+                value={selectedRuntime}
+                onChange={(event) => {
+                  const nextRuntime = event.target.value as
+                    | "codex"
+                    | "opencode";
+                  setRuntime(nextRuntime);
+                  navigate({
+                    ...location,
+                    runtime: nextRuntime,
+                    chat: undefined,
+                    view: "chat",
+                  });
+                }}
               >
                 <option value="codex">Codex</option>
                 <option value="opencode">opencode</option>
@@ -666,6 +773,15 @@ export function HubApp({
           <div className="hub-error">
             聊天与当前工作区或执行器类型不一致，请从侧栏重新选择。
           </div>
+        ) : mode === "wiki" &&
+          (location.view === "sources" || location.view === "review") ? (
+          <Suspense fallback={<p className="hub-muted">正在读取资料库…</p>}>
+            <HubKnowledgeManager
+              key={location.view}
+              initialTab={location.view === "review" ? "review" : "sources"}
+              onNode={openNode}
+            />
+          </Suspense>
         ) : mode === "wiki" && location.view !== "chat" ? (
           <WikiGraphView location={location} navigate={navigate} />
         ) : chat ? (
@@ -715,6 +831,7 @@ export function HubApp({
       {showArchived && currentWorkspace && (
         <ArchivedChats
           workspaceId={currentWorkspace.id}
+          runtime={selectedRuntime}
           close={() => setShowArchived(false)}
           restore={(chat) =>
             navigate({
@@ -725,6 +842,31 @@ export function HubApp({
             })
           }
         />
+      )}
+      {nativePicker && currentWorkspace && (
+        <Suspense fallback={<p>正在读取本机记录…</p>}>
+          <NativeHistoryPicker
+            workspaceId={currentWorkspace.id}
+            close={() => setNativePicker(false)}
+            select={(chat) =>
+              navigate({
+                ...location,
+                workspace: chat.workspace_id,
+                chat: chat.id,
+                runtime: "codex",
+                view: "chat",
+              })
+            }
+          />
+        </Suspense>
+      )}
+      {collectionSettings && currentWorkspace && (
+        <Suspense fallback={<p>正在读取设置…</p>}>
+          <HubCollectionSettings
+            workspaceId={currentWorkspace.id}
+            close={() => setCollectionSettings(false)}
+          />
+        </Suspense>
       )}
     </div>
   );

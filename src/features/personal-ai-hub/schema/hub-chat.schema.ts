@@ -48,6 +48,8 @@ export const Conversation = z.object({
   runtime: Runtime,
   title: z.string(),
   preferred_model_id: z.string().nullable(),
+  native_session_id: z.string().nullable().optional(),
+  native_read_only: z.boolean().optional(),
   archived_at: z.string().nullable(),
   updated_at: z.string(),
   active_turn: z

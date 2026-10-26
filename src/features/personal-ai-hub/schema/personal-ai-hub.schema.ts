@@ -155,12 +155,18 @@ export type AgentMessagesResponse = z.infer<typeof AgentMessagesResponseSchema>;
 export type AgentStatusResponse = z.infer<typeof AgentStatusResponseSchema>;
 
 export type AgentRuntime = "opencode" | "codex";
+export const HubDiagnosticsSchema = z.object({
+  method: z.string().min(1).max(80),
+  native_code: z.number().int().nullable(),
+  upstream_message: z.string().max(300),
+});
 export type HubError = {
   reason: string;
   layer: string;
   message: string;
   requestId: string;
   upstreamStatus?: number;
+  diagnostics?: z.infer<typeof HubDiagnosticsSchema>;
 };
 export type HubResult<T> = import("@/lib/errors/error").Result<T, HubError>;
 export function unwrapHubResult<T>(result: HubResult<T>): T {
@@ -177,6 +183,7 @@ export function unwrapHubResult<T>(result: HubResult<T>): T {
       {
         reason: result.error.reason,
         upstreamStatus: result.error.upstreamStatus,
+        diagnostics: result.error.diagnostics,
       },
     );
   return result.data;

@@ -13,6 +13,31 @@ const context = {
 };
 
 describe("Hub V2 proxy contract", () => {
+  it("retains bounded native method and code diagnostics", async () => {
+    const result = await getWikiGraph(
+      {
+        ...context,
+        fetch: async () =>
+          Response.json(
+            {
+              error: {
+                reason: "AGENT_RUNTIME_NOT_READY",
+                layer: "agent_runtime",
+                diagnostics: {
+                  method: "account/read",
+                  native_code: -32602,
+                  upstream_message: "invalid account parameters",
+                },
+              },
+            },
+            { status: 503 },
+          ),
+      },
+      { scope: "knowledge" },
+    );
+    expect(result.error?.diagnostics?.method).toBe("account/read");
+    expect(result.error?.diagnostics?.native_code).toBe(-32602);
+  });
   it("keeps the original question and request ID, then only reads the accepted turn", async () => {
     const calls: { path: string; method: string; body: unknown }[] = [];
     const input = {

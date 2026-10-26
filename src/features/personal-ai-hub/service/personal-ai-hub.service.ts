@@ -7,6 +7,7 @@ import {
   AgentSessionsResponseSchema,
   AgentStatusResponseSchema,
   CodexCheckResponseSchema,
+  HubDiagnosticsSchema,
   type HubQueryInput,
   HubQueryResponseSchema,
   HubSourcesResponseSchema,
@@ -63,6 +64,29 @@ export function getHubApiConfig(env: HubEnv) {
   return { apiUrl, token };
 }
 const reasons: Record<string, string> = {
+  NATIVE_HISTORY_CHANGED:
+    "原生已完成记录发生变化，未覆盖本地历史，请核验原文。",
+  NATIVE_HISTORY_TOO_LARGE: "原生会话正文超过本次读取上限，请在本机分段整理。",
+  NATIVE_HISTORY_READ_ONLY:
+    "此原生聊天目前仅同步与整理，请在本机续聊或新建 Hub 聊天。",
+  NATIVE_SYNC_BUSY: "原生记录正在读取，请稍后刷新。",
+  KNOWLEDGE_URL_INVALID: "网页链接、格式或访问目标不受支持。",
+  KNOWLEDGE_URL_FAILED: "网页导入失败，请检查链接或上传原始文档。",
+  KNOWLEDGE_SENSITIVE_CONTENT: "所选聊天包含疑似凭证，请先去掉敏感消息。",
+  UPLOAD_CHUNK_CONFLICT: "上传分块与已保存内容不一致。",
+  KB_UPDATING: "知识库更新尚未完成，请查看资料库中的处理进度。",
+  KB_DATA_UNAVAILABLE: "知识资料目录不可读。",
+  KNOWLEDGE_BUSY: "知识库正在更新，请稍后再试。",
+  KNOWLEDGE_JOB_NOT_FOUND: "未找到知识任务。",
+  KNOWLEDGE_JOB_FAILED: "知识任务失败，请按任务编号检查本机日志。",
+  KNOWLEDGE_SOURCE_NOT_FOUND: "未找到原始资料。",
+  KNOWLEDGE_CANDIDATE_NOT_FOUND: "未找到待确认知识。",
+  KNOWLEDGE_REVIEW_CONFLICT: "知识候选已变化或正在处理，请刷新后核对。",
+  KNOWLEDGE_INPUT_TOO_LARGE: "资料内容过长，请指定较小的原文行号范围。",
+  EVIDENCE_UNAVAILABLE: "原文证据缺失、内容变化或校验失败。",
+  UPLOAD_NOT_FOUND: "未找到上传任务。",
+  UPLOAD_INCOMPLETE: "文件分块尚未上传完整。",
+  UPLOAD_HASH_MISMATCH: "上传内容校验失败。",
   HUB_UNAUTHORIZED: "Hub 鉴权失败，请检查两端 token。",
   HUB_INVALID_REQUEST: "请求参数不合法。",
   KB_INDEX_NOT_READY: "所选知识库索引尚未就绪。",
@@ -95,6 +119,8 @@ const reasons: Record<string, string> = {
   AGENT_APPROVAL_REQUIRED: "本版不支持此审批操作。",
   AGENT_POLICY_MISMATCH: "Codex 实际权限或工作目录与 Hub 配置不一致。",
   AGENT_BUSY: "所选执行器正在处理任务，请稍后再试。",
+  NATIVE_PROJECT_CHANGED: "原生项目目录已变化，请重新发现后接入。",
+  WORKSPACE_CONFIG_BUSY: "其它请求正在登记项目，请稍后重试。",
   INDEX_GENERATION_MISMATCH: "索引版本或内容校验失败，请重建所选索引。",
   LOCAL_PARSER_NOT_READY: "本地文档解析或 OCR 未就绪。",
   GRAPH_DATA_UNAVAILABLE: "知识数据库不可读或结构不兼容。",
@@ -118,6 +144,7 @@ export async function hubFetch<T>(
     message: string,
     upstreamStatus?: number,
     layer = "blog_proxy",
+    diagnostics?: z.infer<typeof HubDiagnosticsSchema>,
   ): HubResult<T> => ({
     data: null,
     error: {
@@ -125,6 +152,7 @@ export async function hubFetch<T>(
       message,
       layer,
       requestId,
+      ...(diagnostics === undefined ? {} : { diagnostics }),
       ...(upstreamStatus === undefined ? {} : { upstreamStatus }),
     },
   });
@@ -159,6 +187,7 @@ export async function hubFetch<T>(
               ? "HUB_UPSTREAM_TIMEOUT"
               : "HUB_UPSTREAM_ERROR";
       let layer = "blog_proxy";
+      let diagnostics: z.infer<typeof HubDiagnosticsSchema> | undefined;
       const contentType = response.headers
         .get("Content-Type")
         ?.split(";")[0]
@@ -180,7 +209,9 @@ export async function hubFetch<T>(
                 "agent_runtime",
                 "blog_proxy",
                 "knowledge_graph",
+                "knowledge",
               ]),
+              diagnostics: z.unknown().optional(),
             }),
           })
           .safeParse(body);
@@ -190,6 +221,12 @@ export async function hubFetch<T>(
         ) {
           reason = parsed.data.error.reason;
           layer = parsed.data.error.layer;
+          if (parsed.data.error.diagnostics !== undefined) {
+            const detail = HubDiagnosticsSchema.safeParse(
+              parsed.data.error.diagnostics,
+            );
+            if (detail.success) diagnostics = detail.data;
+          }
         }
       }
       const upstreamRequestId = response.headers.get("X-Hub-Request-Id");
@@ -213,6 +250,7 @@ export async function hubFetch<T>(
           "上游返回 HTTP " + response.status + "，请按请求编号检查日志。",
         response.status,
         layer,
+        diagnostics,
       );
     }
     const body: unknown = await response.json().catch(() => null);

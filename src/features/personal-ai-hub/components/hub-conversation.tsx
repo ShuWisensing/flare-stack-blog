@@ -12,7 +12,7 @@ import {
   RefreshCw,
   Settings2,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import * as Api from "../api/hub-chat.admin.api";
 import type {
   HubConversation,
@@ -22,6 +22,17 @@ import type {
 import { unwrapHubResult } from "../schema/personal-ai-hub.schema";
 import { HubErrorNotice } from "./hub-feedback";
 import { HubMarkdown } from "./hub-markdown";
+
+const ChatKnowledgeCapture = lazy(() =>
+  import("./chat-knowledge-capture").then((module) => ({
+    default: module.ChatKnowledgeCapture,
+  })),
+);
+const NativeSyncStatus = lazy(() =>
+  import("./native-sync-status").then((module) => ({
+    default: module.NativeSyncStatus,
+  })),
+);
 
 const busyStates = new Set([
   "queued",
@@ -201,6 +212,7 @@ export function HubConversationView({
 }) {
   const cache = useQueryClient();
   const [question, setQuestion] = useState("");
+  const [collecting, setCollecting] = useState(false);
   const saved = chat.last_settings;
   const [model, setModel] = useState(
     saved?.model_id ?? chat.preferred_model_id,
@@ -459,6 +471,24 @@ export function HubConversationView({
   }
   return (
     <div className="hub-conversation">
+      {chat.runtime === "codex" && chat.native_session_id && !busy && (
+        <Suspense fallback={null}>
+          <NativeSyncStatus
+            conversationId={chat.id}
+            readOnly={chat.native_read_only === true}
+          />
+        </Suspense>
+      )}
+      <div className="hub-capture-toolbar">
+        <button
+          type="button"
+          disabled={!items?.length || busy}
+          onClick={() => setCollecting(true)}
+        >
+          <BookOpen size={14} />
+          保存到知识库
+        </button>
+      </div>
       {chat.runtime !== "wiki" && (
         <div className="hub-runtime-status">
           <span
@@ -623,7 +653,11 @@ export function HubConversationView({
             }
             value={question}
             maxLength={16000}
-            disabled={busy || Boolean(chat.archived_at)}
+            disabled={
+              busy ||
+              Boolean(chat.archived_at) ||
+              chat.native_read_only === true
+            }
             onChange={(event) => setQuestion(event.target.value)}
             onKeyDown={(event) => {
               if (
@@ -765,6 +799,14 @@ export function HubConversationView({
                   </button>
                 )}
                 <HubErrorNotice error={models.error} />
+                {chat.runtime !== "wiki" && models.isFetching && (
+                  <p className="hub-muted">正在读取原生模型目录…</p>
+                )}
+                {chat.runtime !== "wiki" && models.data?.items.length === 0 && (
+                  <p className="hub-error">
+                    原生目录为空，请核对本机客户端与账号。
+                  </p>
+                )}
               </div>
             </details>
             <span className="hub-knowledge-indicator">
@@ -780,7 +822,8 @@ export function HubConversationView({
                 busy ||
                 modelMissing ||
                 !question.trim() ||
-                Boolean(chat.archived_at)
+                Boolean(chat.archived_at) ||
+                chat.native_read_only === true
               }
             >
               {send.isPending ? (
@@ -795,6 +838,15 @@ export function HubConversationView({
           Enter 发送 · Shift + Enter 换行 · 结果需结合来源核验
         </p>
       </div>
+      {collecting && (
+        <Suspense fallback={<p>正在读取消息…</p>}>
+          <ChatKnowledgeCapture
+            conversationId={chat.id}
+            messages={items ?? []}
+            close={() => setCollecting(false)}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

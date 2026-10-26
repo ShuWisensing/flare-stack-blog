@@ -31,6 +31,11 @@ const api = vi.hoisted(() => ({
   getHubRequestFn: vi.fn(),
 }));
 vi.mock("./api/hub-chat.admin.api", () => api);
+const nativeApi = vi.hoisted(() => ({
+  discoverNativeProjectsFn: vi.fn(),
+  registerNativeProjectFn: vi.fn(),
+}));
+vi.mock("./api/hub-native.admin.api", () => nativeApi);
 vi.mock("./components/wiki-graph-view", () => ({
   WikiGraphView: () => createElement("p", null, "graph"),
 }));
@@ -38,6 +43,113 @@ vi.mock("./components/wiki-graph-view", () => ({
 import { HubApp, type HubLocation } from "./components/hub-app";
 
 const ok = (data: unknown) => ({ data, error: null });
+
+it("closes the project picker after registering a discovered native project", async () => {
+  let registered = false;
+  const workspace = {
+    id: "native-project",
+    name: "原生项目",
+    kind: "agent",
+    root_key: "native",
+    root_path: "E:/native",
+    available: true,
+  };
+  api.listHubWorkspacesFn.mockImplementation(async () =>
+    ok({ items: registered ? [workspace] : [], next_cursor: null }),
+  );
+  api.listHubRootsFn.mockResolvedValue(ok({ items: [] }));
+  api.listHubConversationsFn.mockResolvedValue(
+    ok({ items: [], next_cursor: null }),
+  );
+  nativeApi.discoverNativeProjectsFn.mockResolvedValue(
+    ok({
+      items: [
+        {
+          id: "p",
+          name: "原生项目",
+          cwd: "E:/native",
+          native_id: "n",
+          available: true,
+          error: null,
+          workspace_id: null,
+        },
+      ],
+      next_cursor: null,
+    }),
+  );
+  nativeApi.registerNativeProjectFn.mockImplementation(async () => {
+    registered = true;
+    return ok({ workspace });
+  });
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  });
+  function App() {
+    const [location, navigate] = useState<HubLocation>({
+      view: "chat",
+      scope: "knowledge",
+    });
+    return createElement(HubApp, { mode: "agent", location, navigate });
+  }
+  render(createElement(QueryClientProvider, { client }, createElement(App)));
+  fireEvent.click(await screen.findByRole("button", { name: "添加工作区" }));
+  fireEvent.click(
+    await screen.findByRole("button", { name: "从本机 Codex 发现项目" }),
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "接入 原生项目" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(await screen.findByRole("button", { name: /原生项目/ })).toBeTruthy();
+  client.clear();
+});
+
+it("switching tools selects a separate conversation directory", async () => {
+  api.listHubWorkspacesFn.mockResolvedValue(
+    ok({
+      items: [
+        {
+          id: "w",
+          kind: "agent",
+          root_key: "blog",
+          root_path: "E:/blog",
+          name: "blog",
+          available: true,
+        },
+      ],
+      next_cursor: null,
+    }),
+  );
+  api.listHubConversationsFn.mockImplementation(async ({ data }) =>
+    ok({
+      items: [
+        {
+          id: data.runtime,
+          title: data.runtime + " 对话",
+          runtime: data.runtime,
+          workspace_id: "w",
+        },
+      ],
+      next_cursor: null,
+    }),
+  );
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  });
+  function App() {
+    const [location, navigate] = useState<HubLocation>({
+      view: "chat",
+      scope: "knowledge",
+      workspace: "w",
+    });
+    return createElement(HubApp, { mode: "agent", location, navigate });
+  }
+  render(createElement(QueryClientProvider, { client }, createElement(App)));
+  await screen.findByText("codex 对话");
+  fireEvent.change(screen.getByLabelText("新对话执行器"), {
+    target: { value: "opencode" },
+  });
+  await screen.findByText("opencode 对话");
+  expect(screen.queryByText("codex 对话")).toBeNull();
+});
 function show() {
   const client = new QueryClient({
     defaultOptions: {

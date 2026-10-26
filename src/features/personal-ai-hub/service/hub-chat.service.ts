@@ -65,10 +65,12 @@ export const listHubConversations = (
   workspace_id: string,
   cursor?: string,
   include_archived = false,
+  runtime?: "wiki" | "codex" | "opencode",
 ) =>
   get(
     ctx,
-    "/hub/conversations" + query({ workspace_id, cursor, include_archived }),
+    "/hub/conversations" +
+      query({ workspace_id, cursor, include_archived, runtime }),
     z.object({
       items: z.array(S.Conversation),
       next_cursor: z.string().nullable(),

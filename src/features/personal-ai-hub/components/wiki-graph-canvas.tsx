@@ -1,6 +1,7 @@
 import type { Core } from "cytoscape";
 import { Minus, Plus, Scan } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { nodePresentation } from "../graph-presentation";
 import type { HubGraph, HubGraphEdge } from "../schema/hub-chat.schema";
 
 type Viewport = {
@@ -92,44 +93,32 @@ export function WikiGraphCanvas({
               selector: "node",
               style: {
                 label: "data(label)",
-                "font-size": 10,
+                "font-size": 12,
                 "font-family": "system-ui, sans-serif",
-                color: dark ? "#b5c1d2" : "#677589",
+                color: dark ? "#dbe5f4" : "#334155",
                 "text-valign": "bottom",
                 "text-margin-y": 10,
-                width: 11,
-                height: 11,
+                width: 22,
+                height: 22,
                 "background-color": "#879bb3",
                 "border-width": 3,
                 "border-color": dark ? "#1d2735" : "#f2f5f9",
               },
             },
-            {
-              selector: 'node[kind="concept"]',
-              style: { "background-color": "#9182bc", width: 16, height: 16 },
-            },
-            {
-              selector: 'node[kind="entity"]',
-              style: { "background-color": "#6d9e8b", width: 15, height: 15 },
-            },
-            {
-              selector: 'node[kind="source"]',
+            ...Object.entries(nodePresentation).map(([kind, entry]) => ({
+              selector: 'node[kind="' + kind + '"]',
               style: {
-                "background-color": "#6b8fbe",
-                width: 19,
-                height: 19,
-                "font-size": 11,
+                "background-color": entry.color,
+                shape: entry.shape,
+                width: kind === "summary" || kind === "chunk" ? 17 : 26,
+                height: kind === "summary" || kind === "chunk" ? 17 : 26,
               },
-            },
-            {
-              selector: 'node[kind="summary"]',
-              style: { "background-color": "#83adb1", width: 12, height: 12 },
-            },
+            })),
             {
               selector: "edge",
               style: {
-                width: 0.8,
-                "line-color": dark ? "#3a4657" : "#d6dee8",
+                width: 1.4,
+                "line-color": dark ? "#64748b" : "#94a3b8",
                 "curve-style": "haystack",
                 opacity: 0.8,
               },
@@ -236,6 +225,10 @@ export function WikiGraphCanvas({
         };
         worker.postMessage({
           elements,
+          viewport: {
+            width: graphInstance.width(),
+            height: graphInstance.height(),
+          },
           saved_positions: viewports.get(viewKey)?.positions,
         });
       } catch {

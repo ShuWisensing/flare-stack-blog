@@ -47,6 +47,7 @@ export const listHubConversationsFn = createServerFn({ method: "GET" })
       workspace_id: S.Id,
       cursor: Cursor,
       include_archived: z.boolean().optional(),
+      runtime: S.Runtime,
     }),
   )
   .handler(({ context, data }) =>
@@ -55,6 +56,7 @@ export const listHubConversationsFn = createServerFn({ method: "GET" })
       data.workspace_id,
       data.cursor,
       data.include_archived,
+      data.runtime,
     ),
   );
 export const createHubConversationFn = createServerFn({ method: "POST" })

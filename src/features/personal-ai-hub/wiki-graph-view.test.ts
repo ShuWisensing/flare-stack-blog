@@ -74,6 +74,8 @@ it("shows an honest empty knowledge graph and switches to evidence only on click
   );
   show();
   await screen.findByText("尚无已登记的知识节点");
+  expect(screen.getByLabelText("节点类型说明")).toBeTruthy();
+  expect(screen.getByTitle("用户确认的偏好")).toBeTruthy();
   expect(
     api.getWikiGraphFn.mock.calls.every(
       (call) => call[0].data.scope === "knowledge",
@@ -82,7 +84,11 @@ it("shows an honest empty knowledge graph and switches to evidence only on click
   fireEvent.click(screen.getByRole("button", { name: "查看资料结构" }));
   await screen.findByRole("img", { name: "关系画布" });
 });
-it("searches the full scope and opens the selected result's own content", async () => {
+it.each([
+  "source_overview",
+  "wiki_markdown",
+  "summary_markdown",
+])("searches and reads %s without rendering its internal frontmatter as prose", async (contentType) => {
   api.getWikiGraphFn.mockImplementation(async ({ data }) =>
     ok(graph(data.scope)),
   );
@@ -97,7 +103,10 @@ it("searches the full scope and opens the selected result's own content", async 
   api.getWikiNodeFn.mockResolvedValue(
     ok({
       revision: "rev",
-      node: node("source:hidden", "未绘制资料"),
+      node: {
+        ...node("source:hidden", "未绘制资料"),
+        content_type: contentType,
+      },
       incoming: [],
       outgoing: [],
       neighbors: [],
@@ -110,8 +119,11 @@ it("searches the full scope and opens the selected result's own content", async 
     ok({
       revision: "rev",
       node_id: "source:hidden",
-      content_type: "source_overview",
-      content: "**正确正文**",
+      content_type: contentType,
+      content:
+        contentType === "source_overview"
+          ? "**正确正文**"
+          : "---\nsource_refs:\n  - source:s\n---\n\n# 未绘制资料\n\n**正确正文**",
       next_cursor: null,
       links: [],
       total_bytes: 20,
@@ -124,6 +136,14 @@ it("searches the full scope and opens the selected result's own content", async 
   });
   fireEvent.click(await screen.findByRole("button", { name: /未绘制资料/ }));
   expect((await screen.findByText("正确正文")).tagName).toBe("STRONG");
+  if (contentType !== "source_overview") {
+    expect(
+      screen
+        .getByText(/source_refs:/)
+        .closest("details")
+        ?.hasAttribute("open"),
+    ).toBe(false);
+  }
   expect(api.getWikiContentFn.mock.calls[0][0].data.node_id).toBe(
     "source:hidden",
   );
