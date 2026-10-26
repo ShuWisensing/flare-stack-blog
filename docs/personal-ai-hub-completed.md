@@ -2,6 +2,12 @@
 
 本文记录已经实现、已经形成明确规格，或已经通过源码核验的部分。后续排查时先区分“已接入但可能有 bug”和“尚未实现”。
 
+## 2026-10-26 V3 续做推送与部署
+
+- 博客 Personal AI Hub 源码与状态文档已提交 `e98a571` 并推送到 `main`；GitHub Actions [40338779020](https://github.com/ShuWisensing/flare-stack-blog/actions/runs/40338779020) 的 Cloudflare Workers 部署和 CDN 清理均成功。
+- 线上 `https://libresensing.com/admin/personal-ai-hub` 未登录时按预期跳转 `/login`；管理员页面需要用户已有登录会话才能继续验收，本轮没有伪造会话或把匿名页面当成通过。
+- 本机 FastAPI 8000、opencode 4096、Cloudflare Windows 服务仍在运行；`status_hub.ps1 -Runtime codex` 本机/Tunnel health 和索引均 HTTP 200，索引 generation 为 `v1_5a4409aa5a024d6c84e3bc0baae846cf`。
+
 ## 2026-10-26 V3 已实现与本地重建验证
 
 - 知识管理：管理员文件/笔记/链接导入、资料更新保留旧 source ID、分块校验/并发幂等、后台进度/显式恢复。文本 PDF、DOCX、PPTX、XLSX、HTML、CSV、MD/TXT/代码本地解析；20MiB 文件，1MiB 上传块，扫描/音视频等明确说明暂不支持。
@@ -16,7 +22,7 @@
 - 运行验证：FastAPI 8000、opencode 4096 已启动，cloudflared Windows 服务运行；本机及 hub-api Tunnel 的 /health、/kb/status 均正常。真实 Codex 8 模型、opencode 2 模型；两 Runtime 只读检查 ready。3 条真实本地混合检索+BGE 抽取式查询均返回引用，约 4.35/1.89/1.83 秒，LLM 调用时间为 0。
 - 最终验证（V3 续做前）：后端全量 326 项（89.94 秒），博客 Node 213 项（maxWorkers=2，30.36 秒），Workers 199 项（testTimeout=20000，退出码 0；Windows 临时目录 EBUSY 清理警告保留）。类型检查、709 文件 lint、生产构建（46.38 秒）、pip check、Git diff --check 均通过。续做新增停止脚本/结构化追问/收集器回归后，后端全量 336 项通过；博客新增检查结果随后补记。
 - 博客实际 Catalog/Capabilities/CandidatePage Zod 与本机/Tunnel 两地址契约校验均通过，带 token 200，匿名 health 401；未暴露 token。AGENTS.md 工作区/暂存 hash 保持不变。
-- 边界：博客本轮尚未推送/部署；已有原生聊天当前只读，未验证桌面双向续聊/并发；Pilot、线上管理员上传/提取/问答仍未验收。Codex/opencode/Wiki 本机双轮和一次可选收集人工验收已完成，但 Codex 仍保留偶发 65 秒运行时超时，不自动重试。
+- 边界：已有原生聊天当前只读，未验证桌面双向续聊/并发；Pilot、线上登录管理员上传/提取/问答仍未验收。Codex/opencode/Wiki 本机双轮和一次可选收集人工验收已完成，但 Codex 仍保留偶发 65 秒运行时超时，不自动重试。
 
 ## 2026-10-26 已完成的排查与规格工作（实施前历史）
 

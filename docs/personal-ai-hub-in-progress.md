@@ -4,7 +4,7 @@
 
 ## 2026-10-26 当前焦点：V3 已实现，本地重建完成，线上验收待执行
 
-- 博客代码在本地，尚未推送/部署。当前后端已按 User 环境、WithOpencode、WithCodex、CodexWorkspace=E:\blog 启动；Cloudflare Windows 服务运行，本机/Tunnel 健康与三种索引模式 ready。
+- 博客代码已由 `e98a571` 推送并完成 Cloudflare Workers 自动部署；当前后端按 User 环境、WithOpencode、WithCodex、CodexWorkspace=E:\blog 启动，Cloudflare Windows 服务运行，本机/Tunnel 健康与三种索引模式 ready。
 - 已实现：图谱横向分量布局、顶部类型图例、目录概览、分块文件/文字/公网网页导入、资料版本、候选/证据审核、同代构建与校准、显式重试、聊天知识收集、原生历史只读绑定、日常 Codex 可选观察。详见 completed 与 V3 清单。
 - 知识库现为 21 份资料、925 原始片段、14 篇有原文证据的专业 Wiki 页；语义图 23 节点/38 关系，资料图 42/21。没有自动生成或确认个人偏好。
 - 选定模型：Qwen3-Embedding-4B、NF4、2560 维，固定修订 5cf2132abc99cad020ac570b19d031efec650f2b，权重 D:\AIData\Models\Qwen3-Embedding-4B；重排仍为本地 BGE。RTX 4060 Laptop 8GiB 可同时运行；缺模型/CUDA 明确报错，不自动降级。
@@ -13,7 +13,7 @@
 - Codex 实际模型 8 个，opencode 2 个。已接入一条旧 Codex 主会话，首次 1 轮、重复同步 0 轮、同一 native ID；已有原生会话当前只读。日常收集及付费自动提取生产开关保持关闭，Pilot 适配未做。
 - 最终自动验证：后端 326 项、Node 213 项（maxWorkers=2）、Workers 199 项（testTimeout=20000）通过，类型/lint/生产构建/pip check/diff --check 通过。本机/Tunnel 的新知识 API 经博客真实 Zod 校验均通过；匿名 health 401。
 - 浏览器使用真实只读知识快照/真实组件的隔离布局预览，检查 1440/1920 宽屏、390 手机、浅深主题、节点正文与来源跳转；没有伪造新节点或向生产写入 UI 样例。未登录线上管理员链路，不能据此称端到端上传/DeepSeek/双 Runtime 双轮已验收。
-- 尚需：博客源码推送/自动部署、线上管理员代理验收、原生已有会话网页续聊/并发/桌面刷新、Pilot。未登记项目发现/登记和可选收集新任务已在本机验收；HUB-29 保留 Codex 偶发 65 秒超时，HUB-64 保留原生会话只读边界。
+- 尚需：线上登录管理员代理上传/提取/问答验收、原生已有会话网页续聊/并发/桌面刷新、Pilot。未登记项目发现/登记和可选收集新任务已在本机验收；HUB-29 保留 Codex 偶发 65 秒超时，HUB-64 保留原生会话只读边界。
 
 ### 下方为本轮开始前的规划记录（历史，不代表当前状态）
 
