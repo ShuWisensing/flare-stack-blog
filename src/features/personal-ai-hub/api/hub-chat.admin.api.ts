@@ -32,6 +32,10 @@ export const createHubWorkspaceFn = createServerFn({ method: "POST" })
   .handler(({ context, data }) =>
     Hub.createHubWorkspace(context, data.root_key, data.name),
   );
+export const registerHubDirectoryFn = createServerFn({ method: "POST" })
+  .middleware([adminMiddleware])
+  .inputValidator(S.WorkspaceDirectoryInput)
+  .handler(({ context, data }) => Hub.registerHubDirectory(context, data));
 export const renameHubWorkspaceFn = createServerFn({ method: "POST" })
   .middleware([adminMiddleware])
   .inputValidator(

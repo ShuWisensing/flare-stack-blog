@@ -26,6 +26,16 @@ const write = <T>(
 
 export const listHubRoots = (ctx: HubRequestContext) =>
   get(ctx, "/hub/workspace-roots", z.object({ items: z.array(S.Root) }));
+export const registerHubDirectory = (
+  ctx: HubRequestContext,
+  input: z.infer<typeof S.WorkspaceDirectoryInput>,
+) =>
+  write(
+    ctx,
+    "/hub/workspace-directories",
+    z.object({ workspace: S.Workspace }),
+    S.WorkspaceDirectoryInput.parse(input),
+  );
 export const listHubWorkspaces = (
   ctx: HubRequestContext,
   kind: "wiki" | "agent",

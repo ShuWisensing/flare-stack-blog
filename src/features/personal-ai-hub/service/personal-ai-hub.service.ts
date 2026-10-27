@@ -64,6 +64,9 @@ export function getHubApiConfig(env: HubEnv) {
   return { apiUrl, token };
 }
 const reasons: Record<string, string> = {
+  AGENT_CONFIG_INVALID: "本机 Agent 运行预算配置不合法，请检查 HUB_AGENT_TURN_TIMEOUT_SECONDS。",
+  NATIVE_SESSION_BUSY:
+    "桌面或其它 Codex 客户端仍占用此聊天，请释放原生会话后重试，未复制聊天或抢锁。",
   NATIVE_HISTORY_CHANGED:
     "原生已完成记录发生变化，未覆盖本地历史，请核验原文。",
   NATIVE_HISTORY_TOO_LARGE: "原生会话正文超过本次读取上限，请在本机分段整理。",

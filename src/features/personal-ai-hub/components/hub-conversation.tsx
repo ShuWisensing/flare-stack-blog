@@ -295,7 +295,9 @@ export function HubConversationView({
   )?.runtime_status;
   const models = useQuery({
     queryKey: ["hub-v2", "models", chat.runtime, chat.workspace_id],
-    enabled: chat.runtime !== "wiki" && modelMenu,
+    enabled:
+      chat.runtime !== "wiki" &&
+      (modelMenu || (chat.runtime === "codex" && model !== null)),
     retry: false,
     queryFn: async () => {
       if (chat.runtime === "wiki") throw new Error("Wiki 不使用原生模型目录");
@@ -403,7 +405,15 @@ export function HubConversationView({
     void cache.invalidateQueries({
       queryKey: ["hub-v2", "conversation", chat.id],
     });
-  }, [turn.data, cache, chat.id]);
+    if (chat.runtime === "codex") {
+      void cache.invalidateQueries({
+        queryKey: ["hub-native", chat.workspace_id],
+      });
+      void cache.invalidateQueries({
+        queryKey: ["hub-v2", "conversations", chat.workspace_id, "codex"],
+      });
+    }
+  }, [turn.data, cache, chat.id, chat.runtime, chat.workspace_id]);
   const items = messages.data?.pages
     .slice()
     .reverse()
@@ -417,8 +427,17 @@ export function HubConversationView({
     send.isPending ||
     uncertain ||
     Boolean(turnId && turn.isPending);
+  const nativeModelUnlisted =
+    chat.runtime === "codex" &&
+    model !== null &&
+    Boolean(models.data) &&
+    !models.data?.items.some((item) => item.id === model);
+  const nativeModelUnverified =
+    chat.runtime === "codex" && model !== null && !models.data;
   const modelMissing =
-    chat.runtime !== "codex" && answerMode === "chat" && model === null;
+    nativeModelUnlisted ||
+    nativeModelUnverified ||
+    (chat.runtime !== "codex" && answerMode === "chat" && model === null);
   const requestNotFound = Boolean(
     recover.error &&
       "reason" in recover.error &&
@@ -495,7 +514,7 @@ export function HubConversationView({
             className={`hub-status-dot ${status?.status === "ready" ? "is-ready" : ""}`}
           />
           {chat.runtime === "codex"
-            ? "Codex · 只读项目任务 · 当前账号额度"
+            ? "Codex · 当前账号额度 · 项目文件只读"
             : "opencode · 本机执行 · DeepSeek API"}
           <button
             type="button"
@@ -606,7 +625,13 @@ export function HubConversationView({
       </div>
       <div className="hub-composer-wrap">
         {modelMissing && (
-          <p className="hub-error">本轮模型未指定，请在模型菜单明确选择。</p>
+          <p className="hub-error">
+            {nativeModelUnlisted
+              ? "历史模型不在当前目录，请明确选择可用型号或使用本机配置。"
+              : nativeModelUnverified
+                ? "所选模型尚未通过目录核验，请查看模型菜单。"
+                : "本轮模型未指定，请在模型菜单明确选择。"}
+          </p>
         )}
         {uncertain && (
           <div className="hub-error">
@@ -762,6 +787,14 @@ export function HubConversationView({
                     value={model ?? ""}
                     onChange={(event) => setModel(event.target.value || null)}
                   >
+                    {chat.runtime === "codex" &&
+                      model !== null &&
+                      !models.data?.items.some((item) => item.id === model) && (
+                        <option value={model} disabled>
+                          {model}（历史模型 ·{" "}
+                          {models.data ? "当前目录未列出" : "正在核验目录"}）
+                        </option>
+                      )}
                     {chat.runtime === "codex" ? (
                       <option value="">使用本机 Codex 配置</option>
                     ) : (

@@ -22,6 +22,7 @@ const api = vi.hoisted(() => ({
   getHubModelsFn: vi.fn(),
   listHubRootsFn: vi.fn(),
   createHubWorkspaceFn: vi.fn(),
+  registerHubDirectoryFn: vi.fn(),
   createHubConversationFn: vi.fn(),
   updateHubConversationFn: vi.fn(),
   renameHubWorkspaceFn: vi.fn(),
@@ -34,6 +35,9 @@ vi.mock("./api/hub-chat.admin.api", () => api);
 const nativeApi = vi.hoisted(() => ({
   discoverNativeProjectsFn: vi.fn(),
   registerNativeProjectFn: vi.fn(),
+  listNativeCodexFn: vi.fn(),
+  bindNativeCodexFn: vi.fn(),
+  synchronizeNativeCodexFn: vi.fn(),
 }));
 vi.mock("./api/hub-native.admin.api", () => nativeApi);
 vi.mock("./components/wiki-graph-view", () => ({
@@ -45,6 +49,9 @@ import { HubApp, type HubLocation } from "./components/hub-app";
 const ok = (data: unknown) => ({ data, error: null });
 
 it("closes the project picker after registering a discovered native project", async () => {
+  nativeApi.listNativeCodexFn.mockResolvedValue(
+    ok({ items: [], next_cursor: null }),
+  );
   let registered = false;
   const workspace = {
     id: "native-project",
@@ -103,6 +110,19 @@ it("closes the project picker after registering a discovered native project", as
 });
 
 it("switching tools selects a separate conversation directory", async () => {
+  nativeApi.listNativeCodexFn.mockResolvedValue(
+    ok({
+      items: [
+        {
+          id: "native",
+          title: "codex 对话",
+          updated_at: "2026-10-27",
+          parent_id: null,
+        },
+      ],
+      next_cursor: null,
+    }),
+  );
   api.listHubWorkspacesFn.mockResolvedValue(
     ok({
       items: [
@@ -126,6 +146,7 @@ it("switching tools selects a separate conversation directory", async () => {
           title: data.runtime + " 对话",
           runtime: data.runtime,
           workspace_id: "w",
+          native_session_id: data.runtime === "codex" ? "native" : null,
         },
       ],
       next_cursor: null,
@@ -149,6 +170,60 @@ it("switching tools selects a separate conversation directory", async () => {
   });
   await screen.findByText("opencode 对话");
   expect(screen.queryByText("codex 对话")).toBeNull();
+  expect(nativeApi.listNativeCodexFn).toHaveBeenCalledWith({
+    data: {
+      workspace_id: "w",
+      cursor: undefined,
+      archived: false,
+      include_children: false,
+    },
+  });
+});
+
+it("registers an existing local directory explicitly and selects the resulting workspace", async () => {
+  const workspace = {
+    id: "manual",
+    name: "本机项目",
+    kind: "agent",
+    root_key: "project",
+    root_path: "E:/projects/app",
+    available: true,
+  };
+  api.listHubWorkspacesFn.mockResolvedValue(
+    ok({ items: [], next_cursor: null }),
+  );
+  api.listHubRootsFn.mockResolvedValue(ok({ items: [] }));
+  api.listHubConversationsFn.mockResolvedValue(
+    ok({ items: [], next_cursor: null }),
+  );
+  api.registerHubDirectoryFn.mockResolvedValue(ok({ workspace }));
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  });
+  function App() {
+    const [location, navigate] = useState<HubLocation>({
+      view: "chat",
+      scope: "knowledge",
+    });
+    return createElement(HubApp, { mode: "agent", location, navigate });
+  }
+  render(createElement(QueryClientProvider, { client }, createElement(App)));
+  fireEvent.click(await screen.findByRole("button", { name: "添加工作区" }));
+  fireEvent.change(await screen.findByLabelText("本机项目路径"), {
+    target: { value: "E:/projects/app" },
+  });
+  fireEvent.change(screen.getByLabelText("新工作区名称"), {
+    target: { value: "本机项目" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "添加本地文件夹" }));
+  await waitFor(() =>
+    expect(api.registerHubDirectoryFn).toHaveBeenCalledWith({
+      data: { path: "E:/projects/app", name: "本机项目" },
+    }),
+  );
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(api.createHubConversationFn).not.toHaveBeenCalled();
+  client.clear();
 });
 function show() {
   const client = new QueryClient({
@@ -220,6 +295,96 @@ function ready() {
     }),
   );
 }
+it("shows a newly materialized Codex thread in the native sidebar after the first turn", async () => {
+  ready();
+  let completed = false;
+  let finish!: (value: unknown) => void;
+  const workspace = {
+    id: "w",
+    kind: "agent",
+    name: "blog",
+    root_key: "blog",
+    root_path: "E:/blog",
+    available: true,
+  };
+  const chat = () => ({
+    id: "a",
+    workspace_id: "w",
+    runtime: "codex",
+    title: "网页新对话",
+    preferred_model_id: null,
+    archived_at: null,
+    updated_at: "now",
+    native_session_id: completed ? "native-new" : null,
+    native_read_only: false,
+    active_turn: completed ? null : { id: "first-turn", state: "running" },
+  });
+  api.listHubWorkspacesFn.mockResolvedValue(
+    ok({ items: [workspace], next_cursor: null }),
+  );
+  api.getHubConversationFn.mockImplementation(async () =>
+    ok({ conversation: chat() }),
+  );
+  api.listHubConversationsFn.mockImplementation(async () =>
+    ok({ items: [chat()], next_cursor: null }),
+  );
+  api.getHubRuntimesFn.mockResolvedValue(ok({ items: [] }));
+  api.getHubTurnFn.mockReturnValue(
+    new Promise((resolve) => {
+      finish = resolve;
+    }),
+  );
+  nativeApi.listNativeCodexFn.mockImplementation(async () =>
+    ok({
+      items: completed
+        ? [
+            {
+              id: "native-new",
+              title: "首轮后的原生聊天",
+              parent_id: null,
+              updated_at: "now",
+            },
+          ]
+        : [],
+      next_cursor: null,
+    }),
+  );
+  nativeApi.synchronizeNativeCodexFn.mockResolvedValue(
+    ok({ added_turns: 0, read_only: false, native_busy: false }),
+  );
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  });
+  function App() {
+    const [location, navigate] = useState<HubLocation>({
+      view: "chat",
+      workspace: "w",
+      chat: "a",
+      scope: "knowledge",
+      runtime: "codex",
+    });
+    return createElement(HubApp, { mode: "agent", location, navigate });
+  }
+  render(createElement(QueryClientProvider, { client }, createElement(App)));
+  await screen.findByText(/这个目录尚无原生聊天/);
+  await waitFor(() => expect(api.getHubTurnFn).toHaveBeenCalled());
+  completed = true;
+  finish(
+    ok({
+      turn_id: "first-turn",
+      conversation_id: "a",
+      state: "completed",
+      client_request_id: "rid",
+      error_reason: null,
+      updated_at: "now",
+    }),
+  );
+  expect(
+    await screen.findByRole("button", { name: "首轮后的原生聊天" }),
+  ).toBeTruthy();
+  expect(api.submitHubTurnFn).not.toHaveBeenCalled();
+  client.clear();
+});
 afterEach(() => {
   cleanup();
   vi.resetAllMocks();

@@ -14,13 +14,15 @@ export function NativeHistoryPicker({
   workspaceId,
   close,
   select,
+  initialArchived = false,
 }: {
   workspaceId: string;
   close: () => void;
   select: (chat: HubConversation) => void;
+  initialArchived?: boolean;
 }) {
   const cache = useQueryClient();
-  const [archived, setArchived] = useState(false);
+  const [archived, setArchived] = useState(initialArchived);
   const [children, setChildren] = useState(false);
   const [query, setQuery] = useState("");
   const page = useInfiniteQuery({
@@ -76,7 +78,7 @@ export function NativeHistoryPicker({
           </button>
         </div>
         <p className="hub-muted">
-          读取当前工作区的原生记录，保留同一个会话编号。已有原生聊天目前可同步和整理，请在本机续聊。
+          读取当前项目的原生聊天，保留同一个会话编号。打开后可继续聊天；桌面仍持有写锁时，发送会明确提示占用。
         </p>
         <input
           aria-label="搜索已加载的原生聊天"

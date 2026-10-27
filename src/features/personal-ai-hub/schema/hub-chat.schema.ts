@@ -3,6 +3,10 @@ import { CodexRuntimeStatusSchema } from "./personal-ai-hub.schema";
 
 export const Id = z.string().min(1).max(200);
 export const Runtime = z.enum(["wiki", "codex", "opencode"]);
+export const WorkspaceDirectoryInput = z.object({
+  path: z.string().trim().min(1).max(4096),
+  name: z.string().trim().min(1).max(80),
+});
 export const AgentRuntime = z.enum(["codex", "opencode"]);
 export const Scope = z.enum(["knowledge", "evidence"]);
 export const TurnState = z.enum([

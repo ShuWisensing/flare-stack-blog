@@ -36,6 +36,11 @@ const NativeHistoryPicker = lazy(() =>
     default: module.NativeHistoryPicker,
   })),
 );
+const NativeConversationList = lazy(() =>
+  import("./native-conversation-list").then((module) => ({
+    default: module.NativeConversationList,
+  })),
+);
 const HubCollectionSettings = lazy(() =>
   import("./hub-collection-settings").then((module) => ({
     default: module.HubCollectionSettings,
@@ -62,11 +67,13 @@ function WorkspaceGroup({
   runtime,
   location,
   navigate,
+  selectedNativeId,
 }: {
   workspace: HubWorkspace;
   runtime: HubConversation["runtime"];
   location: HubLocation;
   navigate: HubNavigation;
+  selectedNativeId?: string;
 }) {
   const cache = useQueryClient();
   const [name, setName] = useState(workspace.name);
@@ -149,10 +156,28 @@ function WorkspaceGroup({
           {workspace.error?.message ?? "目录不可用"}
         </p>
       )}
+      {active && runtime === "codex" && (
+        <Suspense fallback={<p>读取本机聊天…</p>}>
+          <NativeConversationList
+            workspaceId={workspace.id}
+            selectedId={selectedNativeId}
+            select={(chat) =>
+              navigate({
+                ...location,
+                view: "chat",
+                workspace: workspace.id,
+                chat: chat.id,
+                runtime: "codex",
+              })
+            }
+          />
+        </Suspense>
+      )}
       {active && (
         <div className="hub-chat-links">
           {chats.data?.pages
             .flatMap((page) => page.items)
+            .filter((chat) => runtime !== "codex" || !chat.native_session_id)
             .map((chat) => (
               <button
                 type="button"
@@ -173,9 +198,11 @@ function WorkspaceGroup({
               </button>
             ))}
           {chats.isPending && <p className="hub-muted">读取聊天…</p>}
-          {chats.data && chats.data.pages[0].items.length === 0 && (
-            <p className="hub-muted">还没有聊天</p>
-          )}
+          {runtime !== "codex" &&
+            chats.data &&
+            chats.data.pages[0].items.length === 0 && (
+              <p className="hub-muted">还没有聊天</p>
+            )}
           <HubErrorNotice
             error={chats.error}
             retry={() => void chats.refetch()}
@@ -298,6 +325,23 @@ function ProjectPicker({
 }) {
   const cache = useQueryClient();
   const [discovering, setDiscovering] = useState(false);
+  const [directory, setDirectory] = useState("");
+  const [directoryName, setDirectoryName] = useState("");
+  const registerDirectory = useMutation({
+    retry: false,
+    mutationFn: async () =>
+      unwrapHubResult(
+        await Api.registerHubDirectoryFn({
+          data: { path: directory, name: directoryName },
+        }),
+      ),
+    onSuccess: ({ workspace }) => {
+      void cache.invalidateQueries({ queryKey: ["hub-v2", "workspaces"] });
+      void cache.invalidateQueries({ queryKey: ["hub-v2", "roots"] });
+      select(workspace);
+      close();
+    },
+  });
   const roots = useQuery({
     queryKey: ["hub-v2", "roots"],
     queryFn: async () => unwrapHubResult(await Api.listHubRootsFn()),
@@ -351,6 +395,54 @@ function ProjectPicker({
         <p className="hub-muted">
           使用本机登记的目录。添加工作区不会把项目导入知识库。
         </p>
+        <form
+          className="hub-directory-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (
+              directory.trim() &&
+              directoryName.trim() &&
+              !registerDirectory.isPending
+            )
+              registerDirectory.mutate();
+          }}
+        >
+          <label>
+            本机项目路径
+            <input
+              aria-label="本机项目路径"
+              value={directory}
+              placeholder="例如 E:\\projects\\my-app"
+              maxLength={4096}
+              onChange={(event) => setDirectory(event.target.value)}
+              required
+            />
+          </label>
+          <label>
+            工作区名称
+            <input
+              aria-label="新工作区名称"
+              value={directoryName}
+              maxLength={80}
+              onChange={(event) => setDirectoryName(event.target.value)}
+              required
+            />
+          </label>
+          <p className="hub-muted">
+            绑定笔记本上已存在的文件夹，不创建目录、不上传项目文件。
+          </p>
+          <button
+            type="submit"
+            disabled={
+              !directory.trim() ||
+              !directoryName.trim() ||
+              registerDirectory.isPending
+            }
+          >
+            {registerDirectory.isPending ? "正在登记…" : "添加本地文件夹"}
+          </button>
+          <HubErrorNotice error={registerDirectory.error} />
+        </form>
         <button
           type="button"
           className="hub-native-open"
@@ -465,6 +557,7 @@ export function HubApp({
   const [adding, setAdding] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [nativePicker, setNativePicker] = useState(false);
+  const [nativeArchived, setNativeArchived] = useState(false);
   const [collectionSettings, setCollectionSettings] = useState(false);
   const [runtime, setRuntime] = useState<"codex" | "opencode">("codex");
   const workspaces = useInfiniteQuery({
@@ -628,10 +721,13 @@ export function HubApp({
               <button
                 type="button"
                 className="hub-native-open"
-                onClick={() => setNativePicker(true)}
+                onClick={() => {
+                  setNativeArchived(false);
+                  setNativePicker(true);
+                }}
               >
                 <Folder size={16} />
-                接入本机 Codex 聊天
+                浏览归档与子会话
               </button>
             )}
           <div className="hub-section-label">
@@ -654,6 +750,7 @@ export function HubApp({
               runtime={selectedRuntime}
               location={location}
               navigate={changeLocation}
+              selectedNativeId={chat?.native_session_id ?? undefined}
             />
           ))}
           {workspaces.data && workspaceItems?.length === 0 && (
@@ -683,12 +780,17 @@ export function HubApp({
           type="button"
           className="hub-archived-button"
           disabled={!currentWorkspace}
-          onClick={() => setShowArchived(true)}
+          onClick={() => {
+            if (selectedRuntime === "codex") {
+              setNativeArchived(true);
+              setNativePicker(true);
+            } else setShowArchived(true);
+          }}
         >
           <Archive size={13} />
           已归档聊天
         </button>
-        <p className="hub-storage-note">聊天保存在本机 · SQLite</p>
+        <p className="hub-storage-note">聊天在本机保存 · 原生记录同步</p>
       </aside>
       <main className="hub-main">
         <header className="hub-header">
@@ -801,7 +903,7 @@ export function HubApp({
             <p>
               {mode === "wiki"
                 ? "查找资料、追问概念，或沿着知识图谱继续探索。"
-                : "选择一个本机项目，用 Codex 或 opencode 开始独立聊天。"}
+                : "选择本机项目，浏览原生记录或用 Codex、opencode 开始聊天。"}
             </p>
             <button
               type="button"
@@ -847,6 +949,7 @@ export function HubApp({
         <Suspense fallback={<p>正在读取本机记录…</p>}>
           <NativeHistoryPicker
             workspaceId={currentWorkspace.id}
+            initialArchived={nativeArchived}
             close={() => setNativePicker(false)}
             select={(chat) =>
               navigate({

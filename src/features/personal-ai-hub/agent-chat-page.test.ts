@@ -93,6 +93,30 @@ it("uses local Codex configuration without DeepSeek model options or automatic c
   expect(document.querySelector('option[value^="deepseek"]')).toBeNull();
   expect(api.checkHubRuntimeFn).not.toHaveBeenCalled();
 });
+it("keeps a historical Codex model explicit when it is absent from the current catalog", async () => {
+  ready();
+  show({ ...chat, preferred_model_id: "retired-model" });
+  fireEvent.click(await screen.findByText("retired-model"));
+  const selector = await screen.findByRole("combobox", {
+    name: "模型",
+  });
+  await screen.findByText(/历史模型.*当前目录未列出/);
+  expect(selector).toHaveProperty("value", "retired-model");
+  fireEvent.change(screen.getByRole("textbox", { name: "发送消息" }), {
+    target: { value: "继续" },
+  });
+  expect(
+    (screen.getByRole("button", { name: "发送" }) as HTMLButtonElement)
+      .disabled,
+  ).toBe(true);
+  fireEvent.change(selector, { target: { value: "codex-test-model" } });
+  expect(selector).toHaveProperty("value", "codex-test-model");
+  expect(
+    (screen.getByRole("button", { name: "发送" }) as HTMLButtonElement)
+      .disabled,
+  ).toBe(false);
+  expect(api.submitHubTurnFn).not.toHaveBeenCalled();
+});
 it("checks the selected runtime and workspace without submitting a task", async () => {
   ready();
   api.checkHubRuntimeFn.mockResolvedValue(

@@ -1505,3 +1505,30 @@
   border-radius: 8px;
   flex-shrink: 0;
 }
+.hub-directory-form {
+  display: grid;
+  gap: 12px;
+  margin: 18px 0;
+  padding: 16px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 14px;
+}
+.hub-directory-form label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+}
+.hub-directory-form input {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  padding: 10px 12px;
+  font: inherit;
+}
+.hub-directory-form input:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
