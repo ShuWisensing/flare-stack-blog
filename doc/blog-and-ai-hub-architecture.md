@@ -47,6 +47,8 @@ flowchart LR
 
 博客代码推送到 `ShuWisensing/flare-stack-blog` 的 `main` 后，由 `.github/workflows/deploy.yml` 构建、部署 Worker 并清理 CDN。这个过程只部署博客：**不会自动更新或重启笔记本上的 Python、opencode、模型或数据。**
 
+2026-10-27 核验：博客源码 `a46ebe4` 已由 [GitHub Actions 40453588464](https://github.com/ShuWisensing/flare-stack-blog/actions/runs/40453588464) 部署成功并清理 CDN；本地 Hub 与 opencode 已运行，本机及 Tunnel 健康和三种检索索引正常。匿名管理员入口跳转登录页；这不代替用户登录后的上传、发布和网页对话验收。
+
 ## 3. 外网访问、鉴权和 MCP 的方向
 
 目标链路是：`libresensing.com` 管理员 → 博客服务端代理 → `https://hub-api.libresensing.com` → Tunnel → `127.0.0.1:8000`。
