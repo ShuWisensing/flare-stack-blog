@@ -10,7 +10,7 @@
 - User `CODEX_HOME` 与 Hub 使用 D；C 的 sessions / archived_sessions / .chatgpt-projects 兼容联接到 D，让旧路径指向同一份实际数据。旧目录和备份保留，原生 SQLite 未手工改写、没有发起模型任务。桌面当前 UI 的缓存刷新仍需在任务结束后重启应用核验；3 条缺少线程原文的旧导航引用只保留审计。
 - 2026-10-28 追加修复真实账号检查失败：全局与会话工具覆盖分开，Hub 内置 Apps 单独关闭；原生账号、临时只读会话及 MCP 工具清单回读通过，未发模型任务。启动参数显式空 executable 在 PowerShell 5.1/7 均拒绝，避免误用 PATH。
 - 验证：后端全量 349 项，最后原生协议 38 项及 PowerShell 脚本 33 项回归通过；博客 Node 全量 219 项、Workers、类型、711 文件 lint、生产构建通过。首次并行 Node 运行两条无关 Markdown 测试冷启动超时，串行复核及全量 maxWorkers=1 全绿。1440/390 宽度下强度菜单与选择已用真实目录快照检查，未操作生产聊天。
-- FastAPI / opencode 已重启，本机 Codex 与 opencode 检查 ready，索引 ready；本机及带 token 的 PowerShell 公网 health 200。博客本次部署待 Actions 确认；完整说明见根目录 `doc/blog-and-ai-hub-architecture.md` 的 7、8.1、10 节。
+- FastAPI / opencode 已重启，本机 Codex 与 opencode 检查 ready，索引 ready；本机及带 token 的 PowerShell 公网 health 200。业务源码 `caab769` 已由 [40618993166](https://github.com/ShuWisensing/flare-stack-blog/actions/runs/40618993166) 部署成功，CDN 清理成功；线上首页 200，管理员入口匿名跳转登录。完整说明见根目录 `doc/blog-and-ai-hub-architecture.md` 的 7、8.1、10 节。
 
 ## 2026-10-27 网页 Codex、目录登记与长期说明
 

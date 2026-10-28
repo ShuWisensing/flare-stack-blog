@@ -9,7 +9,7 @@
 - 本轮规格：补齐 Codex 思考强度和原生 Home/项目同步（HUB-88/89）。输入为官方模型目录与用户选择的 `reasoning_effort`，输出为保存后的轮次设置及原生 `turn/start.effort`；空值明确继承原生配置，未知/不支持的强度明确拒绝，Wiki/opencode 不接受 Codex 强度。页面显示当前选择、模型支持项和默认值。
 - 原生同步规格：C 旧 Home 仅作为迁移来源，D 为活动 Home；以 thread ID、rollout 身份和确切项目根路径核验重叠，先一致备份再补充缺失数据，已有更新不覆盖。项目归属经新版本标准协议处理，网页新线程关联原生 project ID；同名异目录保留独立，不复制项目文件、不改模型权限、不强行卸载桌面会话。验收边界沿用已有 API、原生协议适配器与聊天 UI 的回归，并以真实只读目录/历史回读核验，不调用付费模型。
 
-- 2026-10-28 收尾：强度目录/选择/保存/恢复、原生项目归属、名称和全部 provider 目录均已实现。另修复全局/项目 MCP 覆盖作用域及内置 Apps 隔离，真实账号与临时只读会话通过。后端全量 349 项、最后协议 38 项及脚本 33 项回归通过；Node 全量 219、Workers、类型/lint/构建通过。两 Runtime 与索引 ready，本机和 PowerShell 公网 health 200；等待本次 GitHub Actions 部署确认，桌面刷新仍待用户任务结束后核验。
+- 2026-10-28 收尾：强度目录/选择/保存/恢复、原生项目归属、名称和全部 provider 目录均已实现。另修复全局/项目 MCP 覆盖作用域及内置 Apps 隔离，真实账号与临时只读会话通过。后端全量 349 项、最后协议 38 项及脚本 33 项回归通过；Node 全量 219、Workers、类型/lint/构建通过。两 Runtime 与索引 ready，本机和 PowerShell 公网 health 200；业务源码 `caab769` 已由 [40618993166](https://github.com/ShuWisensing/flare-stack-blog/actions/runs/40618993166) 部署成功，CDN 清理成功。桌面刷新仍待用户任务结束后核验。
 
 - 按用户澄清，Codex 是可操作的网页客户端：新建/聊天/选模型保留，已有原生线程在 writer lock 保护下同 ID 续聊。本轮新增直接原生侧栏与本地目录登记，源码 `a46ebe4` 已推送并[部署成功](https://github.com/ShuWisensing/flare-stack-blog/actions/runs/40453588464)。
 - 长期架构/使用/维护说明已建立于 `doc/blog-and-ai-hub-architecture.md` 并加入项目规则；实际 opencode 原生数据目录与 Hub 投影目录分别记录，旧规格冲突以最新用户边界为准。

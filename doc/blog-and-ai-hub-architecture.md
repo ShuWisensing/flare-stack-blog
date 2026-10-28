@@ -47,7 +47,7 @@ flowchart LR
 
 博客代码推送到 `ShuWisensing/flare-stack-blog` 的 `main` 后，由 `.github/workflows/deploy.yml` 构建、部署 Worker 并清理 CDN。这个过程只部署博客：**不会自动更新或重启笔记本上的 Python、opencode、模型或数据。**
 
-2026-10-27 核验：博客源码 `a46ebe4` 已由 [GitHub Actions 40453588464](https://github.com/ShuWisensing/flare-stack-blog/actions/runs/40453588464) 部署成功并清理 CDN；本地 Hub 与 opencode 已运行，本机及 Tunnel 健康和三种检索索引正常。匿名管理员入口跳转登录页；这不代替用户登录后的上传、发布和网页对话验收。
+2026-10-28 核验：本次博客业务源码 `caab769` 已由 [GitHub Actions 40618993166](https://github.com/ShuWisensing/flare-stack-blog/actions/runs/40618993166) 部署成功并清理 CDN；本地 Hub / opencode 已重启，两个 Runtime 检查与索引 ready。首页 200，匿名管理员入口跳转登录页；这不代替用户登录后的网页对话及桌面刷新验收。
 
 ## 3. 外网访问、鉴权和 MCP 的方向
 
@@ -298,6 +298,8 @@ opencode 的上述路径由 2026-10-27 本机 `opencode debug paths` 确认。�
 - 将两边旧导航中可核验的 72 条项目归属，经 `thread/metadata/update` 写回同一个 D Home；没有直接改原生 SQLite、抢锁、复制线程或覆盖 D 的新历史。3 条旧导航引用在两边都没有对应线程/rollout，保留审计线索，不虚构历史或自动删除。
 - C 根目录改名受系统访问限制；已恢复当时移出的文件，保留旧 Home。最终仅将 `C:\Users\songm\.codex\sessions`、`archived_sessions`、`.chatgpt-projects` 建立目录联接，目标为 D Home 的同名目录，旧绝对路径读写也落在 D 的同一文件。旧目录副本 `*-before-d-sync-20261027`、C 根旁保留目录及一致备份均未删除。不要继续将旧 C SQLite 当成第二个活动 Home。
 - 完整审计在本机 `E:\wiki\data\runtime\codex-home-sync-20261027-{plan,result}.json`。一致备份为 `D:\AIData\Backups\codex-home-sync-20261027-225125`，包含两边原生 SQLite 一致快照、会话文件、索引与关键配置；含私密数据，只留本机。
+
+收尾还核对了旧 C Home：auth、会话索引和全局状态与备份一致；C 的 config.toml 在迁移快照后有后台回写差异，原版仍在备份中，未强制覆盖后来的配置。运行中的 Hub 与今后的 Codex 均以 D Home 的完整配置为准，不能再把旧 C 配置作为活动设置。
 
 新启动的桌面/CLI 应继承 User 级 `CODEX_HOME`；已打开的旧终端不会自动更新环境。桌面 UI 的旧项目缓存仍需重开项目或在本任务结束后重启应用核验，不能在当前任务中杀掉承载它的桌面进程。
 
