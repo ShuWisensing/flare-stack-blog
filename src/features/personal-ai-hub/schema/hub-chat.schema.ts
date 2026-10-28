@@ -43,6 +43,7 @@ export const KnowledgeOptions = z.object({
 });
 const SettingsSnapshot = z.object({
   model_id: z.string().nullable(),
+  reasoning_effort: z.string().nullable().optional(),
   answer_mode: z.enum(["chat", "search"]),
   knowledge: KnowledgeOptions,
 });
@@ -85,6 +86,13 @@ export const TurnInput = z.object({
     .max(16000)
     .refine((q) => Boolean(q.trim()), "问题不能为空"),
   model_id: z.string().min(1).max(128).nullable(),
+  reasoning_effort: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z][a-z0-9_]*$/)
+    .nullable()
+    .optional(),
   answer_mode: z.enum(["chat", "search"]),
   knowledge: KnowledgeOptions,
 });
@@ -122,7 +130,16 @@ export const Check = z.object({
   runtime_status: RuntimeStatus,
 });
 export const Models = z.object({
-  items: z.array(z.object({ id: z.string(), name: z.string() })),
+  items: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      default_reasoning_effort: z.string().optional(),
+      reasoning_efforts: z
+        .array(z.object({ id: z.string(), description: z.string() }))
+        .optional(),
+    }),
+  ),
   configured_model: z.string().nullable(),
 });
 export const GraphNode = z.object({

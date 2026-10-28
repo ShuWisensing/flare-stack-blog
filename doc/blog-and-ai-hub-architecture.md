@@ -205,6 +205,8 @@ opencode 默认 provider 为 `deepseek-direct`，兼容地址 `https://api.deeps
 
 旧聊天保存的 Codex 型号如果已不在当前目录中，会保留明确的历史型号选项并暂停发送，直到你选择当前可用型号或明确选择本机配置；不会让菜单表面显示本机配置、实际仍发送旧型号。
 
+2026-10-27 补齐思考强度：模型目录保留原生 `supportedReasoningEfforts/defaultReasoningEffort`，模型菜单按当前型号列出可用强度。显式选择经 `reasoning_effort` 保存到轮次设置，并传给 `turn/start.effort`；重开页面恢复上次网页选择。换模型后若旧强度不受支持，保留该选择并暂停发送，要求明确重选。选择“继承原生会话 / 本机配置”时不发送 effort，原生恢复结果决定实际值；目录默认值只是模型说明，不冒充当前会话值。此项只用于 Codex，不改变 Wiki 或 opencode 参数。正文输入栏显示网页选择，折叠详情记录选择值及本轮原生有效值；尚未实现桌面调参后网页菜单实时跟随。
+
 ### 7.2 Wiki 怎样帮助 Agent
 
 启用知识库时：问题 → 本地检索/重排 → 召回片段与引用 → 与用户问题一起交给 Runtime。提示明确说明资料是不可信参考，不把资料里的命令当成系统指令。Agent 自己使用工具读项目或执行操作；这不是给 Agent 微调，也不是自动安装新记忆系统。
@@ -215,6 +217,10 @@ opencode 默认 provider 为 `deepseek-direct`，兼容地址 `https://api.deeps
 
 目标是复用 Codex 能力的网页客户端，不是 iframe 嵌入桌面 UI。工作区侧栏读取该目录的原生聊天；归档、子会话和分页按原生 API 读取，点击后在 Hub 保存展示投影和映射。首次新建网页聊天只产生 Hub 记录，首条实际消息才创建原生 thread，轮次结束后刷新原生目录和 Hub 待绑定列表。桌面产生的新聊天可用“刷新本机聊天”重新读取。
 
+项目发现同时读取 `thread/list` 与 `project/list`，使用原生项目名称；旧聊天尚无 project ID 时，只按唯一且确切的根目录关联展示名。同名不同目录不合并。目录显式传 `modelProviders=[]`，包括 Codex 曾经使用其它 provider 的记录；这些仍是 Codex 历史，不是 opencode 会话。没有用户事件的内部记录是否列出由原生 API 决定，不能把 SQLite 总行数等同于侧栏聊天数。
+
+新网页 Codex 聊天首轮先查原生项目：唯一确切目录匹配则复用 project ID；没有匹配时以该目录生成幂等键调用 `project/create`，再将 project ID 传入 `thread/start`。重复根目录归属或协议不支持会明确拒绝，不创建替代历史。已有聊天仍按原 thread ID 恢复，不因接入而另建线程。
+
 既有聊天接入使用原 thread ID。恢复时原生 Codex 持有写者锁，网页不能强行接管桌面仍加载的同一线程：遇到 `NATIVE_SESSION_BUSY`，先在本机结束/释放对应会话，再显式重试。不要删锁文件、杀桌面进程或自动 fork 线程绕过限制。
 
 ```mermaid
@@ -224,10 +230,10 @@ sequenceDiagram
     participant Native as Codex App Server
     participant Store as 同一 Codex Home
     Web->>Hub: 查看项目与原生聊天
-    Hub->>Native: thread/list + thread/read
+    Hub->>Native: project/list + thread/list + thread/read
     Native-->>Hub: 原生 ID / 已保存轮次
     Hub-->>Web: 展示历史和本地映射
-    Web->>Hub: 发送消息及选定模型
+    Web->>Hub: 发送消息、模型及思考强度
     Hub-->>Web: 202 + 本轮任务 ID
     Hub->>Native: thread/resume 原 ID
     Native->>Store: 获取原生 writer lock
@@ -235,7 +241,7 @@ sequenceDiagram
       Native-->>Hub: active writer 冲突
       Hub-->>Web: 明确占用，无新线程、无重发
     else 获取成功
-      Hub->>Native: turn/start
+      Hub->>Native: turn/start（model / effort）
       Native->>Store: 持久化原生轮次
       Native-->>Hub: 最终回答
       Hub-->>Web: 消息、状态与引用
@@ -245,6 +251,8 @@ sequenceDiagram
 锁在标准 Codex 协议内生效，不是只覆盖 Hub 的 Python 锁。2026-10-27 使用两个独立 stdio 连接进行过无模型任务的真实互斥探测；第二个恢复被原生拒绝。此证据不能扩大为桌面窗口会自动刷新、两端可以同时写入、或网页完整复刻所有桌面插件。
 
 当前适配器仍显式使用本机只读文件沙箱和 `approvalPolicy=never`，并关闭继承的 MCP/插件工具。这允许聊天和读取项目，**不代表已经实现与桌面完全相同的文件写入、权限选择和审批 UI**。权限扩展需要单独开发验收，不能只改界面文案。
+
+2026-10-28 真实连接复核修复了配置作用域：账号/目录接口的 CLI 覆盖只禁用 Home 已声明的工具；创建/恢复会话时，scoped config 再禁用 Home 和项目的完整集合。把项目专属 MCP 的仅 enabled 配置塞进全局会形成缺少连接信息的配置，触发 `workspace requirements: invalid data`，无需修改原始 MCP 凭证。内置账号 Apps 另通过 Hub 子进程的 `features.apps=false` 关闭，桌面配置不改；真实临时只读会话回读确认五个本地 MCP 均零工具，且没有账号 Apps 工具。此次复核未提交模型任务。
 
 ### 7.4 后台任务与超时
 
@@ -260,7 +268,7 @@ sequenceDiagram
 
 添加工作区有两种入口：从 Codex 原生历史发现项目并显式接入；或者“添加本地文件夹”，填写笔记本已有绝对路径和名称。网页不直接弹出远程笔记本的系统文件选择器，也不通过此入口创建磁盘文件夹。
 
-登记一个空工作区先只更新 Hub 的目录列表；原生 Codex 项目可通过后续持久化聊天的 cwd 被发现。当前不会修改桌面内部项目列表文件，因此不保证桌面侧栏立即出现新工作区或自动刷新。
+登记一个空工作区先只更新 Hub 的目录列表；首条 Codex 消息通过原生项目 API 建立或复用项目归属，并建立持久化聊天。不直接改桌面 JSON/SQLite 来伪造项目。原生已保存不代表桌面当前窗口立即刷新，必要时重新打开项目或重启桌面应用。
 
 一个工作区可以有许多聊天，但每个聊天固定 runtime。新聊天只先写 Hub SQLite；Wiki 直接处理问答，Codex/opencode 在第一轮发送时才建立或恢复自己的原生会话。切换 Codex/opencode 只是换目录视图，不把旧聊天改成另一个 Runtime。
 
@@ -283,6 +291,16 @@ opencode 的上述路径由 2026-10-27 本机 `opencode debug paths` 确认。�
 
 浏览器地址保存工作区、chat ID、Runtime 和图谱视图；sessionStorage 中原请求 UUID 只用于找回提交结果。清理浏览器缓存不会删除本机聊天。Hub SQLite 不是 Codex 原生 state 的替代品，不能通过直接插入原生数据库“同步”历史。
 
+### 8.1 C → D 原生历史恢复记录（2026-10-27）
+
+- 活动 Home 固定为 `D:\AIData\Codex`，User 级 `CODEX_HOME` 已确认；Hub 子进程显式传入该 Home。旧 C Home 的 241 个线程 ID、20 个项目均包含在 D 的 476 线程、21 项目中，session_index 没有 C 独有 ID，不能将侧栏差异等同于全部历史丢失。
+- 恢复了 D 缺失的一份约 7.16MB rollout，并补入 1200 个缺失可视化资源文件（62,231,001 字节）。一条旧聊天通过原生 `thread/resume` 重新物化历史，恢复 1 轮 / 56 条目；没有提交模型任务。按原生历史表主键对账，C 备份的 2387 轮、43128 条目、233 个历史投影在 D 均无缺项。
+- 将两边旧导航中可核验的 72 条项目归属，经 `thread/metadata/update` 写回同一个 D Home；没有直接改原生 SQLite、抢锁、复制线程或覆盖 D 的新历史。3 条旧导航引用在两边都没有对应线程/rollout，保留审计线索，不虚构历史或自动删除。
+- C 根目录改名受系统访问限制；已恢复当时移出的文件，保留旧 Home。最终仅将 `C:\Users\songm\.codex\sessions`、`archived_sessions`、`.chatgpt-projects` 建立目录联接，目标为 D Home 的同名目录，旧绝对路径读写也落在 D 的同一文件。旧目录副本 `*-before-d-sync-20261027`、C 根旁保留目录及一致备份均未删除。不要继续将旧 C SQLite 当成第二个活动 Home。
+- 完整审计在本机 `E:\wiki\data\runtime\codex-home-sync-20261027-{plan,result}.json`。一致备份为 `D:\AIData\Backups\codex-home-sync-20261027-225125`，包含两边原生 SQLite 一致快照、会话文件、索引与关键配置；含私密数据，只留本机。
+
+新启动的桌面/CLI 应继承 User 级 `CODEX_HOME`；已打开的旧终端不会自动更新环境。桌面 UI 的旧项目缓存仍需重开项目或在本任务结束后重启应用核验，不能在当前任务中杀掉承载它的桌面进程。
+
 ## 9. 知识图谱与 Obsidian 类似在哪里
 
 知识网络展示实际存在的概念、实体、方法、项目、偏好、规则和关联来源；资料结构展示资料、摘要、片段、资源等证据层。两种视图用途不同，不能用资料关系冒充语义知识网络。
@@ -302,6 +320,10 @@ cd E:\wiki
 ```
 
 启动会读取所选层级的系统变量、检查端口，并在 API 接收请求前预热本地模型，最长等待 180 秒。`-WithCodex` 校验本机配置，不意味着额外启动一个常驻 Codex HTTP 服务。Cloudflared 是已有 Windows 服务，Hub 启动脚本不会替你新建 Tunnel。
+
+Codex 程序版本也必须一致。本机 PATH 仍有 0.159.2，而桌面使用 `0.164.0-alpha.11.1`。User 级 `HUB_CODEX_EXECUTABLE` 已指向当前桌面程序 `C:\Users\songm\AppData\Local\OpenAI\Codex\bin\2993767bd1dfb009\codex.exe`，启动脚本会读取并显示该路径；也可通过 `-CodexExecutable` 显式指定。配置路径无效会报错，不转用 PATH 的旧版本。桌面升级若更换程序目录，需要相应更新此配置，再重启 Hub。
+
+2026-10-28 最新本机复核：FastAPI / opencode 已按上述 User 配置重新启动，Codex 与 opencode 实际连接检查均 ready，知识库索引 ready。本机 health 为 200；带 token 的 PowerShell 公网 health 为 200。曾有 Python urllib 公网探测返回 403，不能据此将本机 Codex 协议错误归因于校园网，也不能把单客户端探测当成管理员页面完整验收。
 
 重启前先确保没有执行或未知任务。停止脚本只管理已登记的进程，核对创建时间与可执行文件身份，不应按 python/node 名称全机结束进程：
 

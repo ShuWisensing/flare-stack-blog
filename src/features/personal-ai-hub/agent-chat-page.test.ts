@@ -60,7 +60,24 @@ function ready() {
   );
   api.getHubModelsFn.mockResolvedValue(
     ok({
-      items: [{ id: "codex-test-model", name: "Codex 原生模型" }],
+      items: [
+        {
+          id: "codex-test-model",
+          name: "Codex 原生模型",
+          default_reasoning_effort: "medium",
+          reasoning_efforts: [
+            { id: "low", description: "Fast" },
+            { id: "medium", description: "Balanced" },
+            { id: "high", description: "Deep" },
+          ],
+        },
+        {
+          id: "limited-model",
+          name: "轻量模型",
+          default_reasoning_effort: "low",
+          reasoning_efforts: [{ id: "low", description: "Fast" }],
+        },
+      ],
       configured_model: "codex-test-model",
     }),
   );
@@ -84,6 +101,61 @@ afterEach(() => {
   cleanup();
   vi.resetAllMocks();
   sessionStorage.clear();
+});
+it("restores Codex reasoning effort, submits the selected effort and blocks unsupported model combinations", async () => {
+  ready();
+  api.submitHubTurnFn.mockResolvedValue(
+    ok({ turn_id: "sent", state: "queued" }),
+  );
+  api.getHubTurnFn.mockResolvedValue(
+    ok({ turn_id: "sent", state: "completed" }),
+  );
+  show({
+    ...chat,
+    last_settings: {
+      model_id: "codex-test-model",
+      reasoning_effort: "high",
+      answer_mode: "chat",
+      knowledge: {
+        enabled: false,
+        retrieval_mode: "hybrid",
+        rerank_mode: "off",
+      },
+    },
+  });
+  const effort = await screen.findByRole("combobox", {
+    name: "思考强度",
+    hidden: true,
+  });
+  await waitFor(() => expect(effort).toHaveProperty("value", "high"));
+  fireEvent.change(screen.getByRole("textbox", { name: "发送消息" }), {
+    target: { value: "读取 README" },
+  });
+  const modelSelect = screen.getByRole("combobox", {
+    name: "模型",
+    hidden: true,
+  });
+  fireEvent.change(modelSelect, { target: { value: "limited-model" } });
+  expect(screen.getByRole("button", { name: "发送" })).toHaveProperty(
+    "disabled",
+    true,
+  );
+  expect(effort).toHaveProperty("value", "high");
+  fireEvent.change(modelSelect, { target: { value: "codex-test-model" } });
+  fireEvent.change(effort, { target: { value: "medium" } });
+  fireEvent.click(screen.getByRole("button", { name: "发送" }));
+  await waitFor(() =>
+    expect(api.submitHubTurnFn).toHaveBeenCalledWith({
+      data: {
+        id: "c",
+        input: expect.objectContaining({
+          model_id: "codex-test-model",
+          reasoning_effort: "medium",
+          question: "读取 README",
+        }),
+      },
+    }),
+  );
 });
 it("uses local Codex configuration without DeepSeek model options or automatic checks", async () => {
   ready();

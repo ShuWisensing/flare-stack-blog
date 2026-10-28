@@ -74,7 +74,7 @@ export function NativeProjectPicker({
           </button>
         </div>
         <p className="hub-muted">
-          从原生聊天发现项目目录。接入只登记工作区，聊天由你按需选择。
+          读取原生项目名称与聊天目录。不同路径的同名项目分别保留，聊天由你按需选择。
         </p>
         <input
           aria-label="搜索已发现项目"

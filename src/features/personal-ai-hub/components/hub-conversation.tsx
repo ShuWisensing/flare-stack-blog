@@ -51,6 +51,17 @@ const labels: Record<string, string> = {
   interrupted: "服务重启，本轮已中断",
   unknown: "任务结果未知，请核验原任务后再发送",
 };
+const effortLabels: Record<string, string> = {
+  none: "关闭",
+  minimal: "极低",
+  low: "低",
+  medium: "中",
+  high: "高",
+  xhigh: "更高",
+  max: "最高",
+  ultra: "Ultra",
+};
+const effortLabel = (effort: string) => effortLabels[effort] ?? effort;
 
 function SavedCitation({
   message,
@@ -161,6 +172,12 @@ function MessageDetails({
               {typeof details.data.settings?.model_id === "string" && (
                 <p>本轮选择：{details.data.settings.model_id}</p>
               )}
+              {typeof details.data.settings?.reasoning_effort === "string" && (
+                <p>
+                  思考强度：
+                  {effortLabel(details.data.settings.reasoning_effort)}
+                </p>
+              )}
               {details.data.tool_summary.map((item, index) => (
                 <p key={String(item.type) + index}>
                   {item.type === "runtime"
@@ -170,6 +187,9 @@ function MessageDetails({
                       : "原生活动"}
                   {typeof item.runtime === "string" ? `：${item.runtime}` : ""}
                   {typeof item.model === "string" ? ` · ${item.model}` : ""}
+                  {typeof item.reasoning_effort === "string"
+                    ? ` · 思考 ${effortLabel(item.reasoning_effort)}`
+                    : ""}
                   {typeof item.query === "string" ? `：${item.query}` : ""}
                   {typeof item.status === "string" ? ` · ${item.status}` : ""}
                 </p>
@@ -216,6 +236,9 @@ export function HubConversationView({
   const saved = chat.last_settings;
   const [model, setModel] = useState(
     saved?.model_id ?? chat.preferred_model_id,
+  );
+  const [reasoningEffort, setReasoningEffort] = useState<string | null>(
+    saved?.reasoning_effort ?? null,
   );
   const [knowledge, setKnowledge] = useState(
     saved ? saved.knowledge.enabled : true,
@@ -297,7 +320,9 @@ export function HubConversationView({
     queryKey: ["hub-v2", "models", chat.runtime, chat.workspace_id],
     enabled:
       chat.runtime !== "wiki" &&
-      (modelMenu || (chat.runtime === "codex" && model !== null)),
+      (modelMenu ||
+        (chat.runtime === "codex" &&
+          (model !== null || reasoningEffort !== null))),
     retry: false,
     queryFn: async () => {
       if (chat.runtime === "wiki") throw new Error("Wiki 不使用原生模型目录");
@@ -434,9 +459,19 @@ export function HubConversationView({
     !models.data?.items.some((item) => item.id === model);
   const nativeModelUnverified =
     chat.runtime === "codex" && model !== null && !models.data;
+  const selectedNativeModel = models.data?.items.find(
+    (item) => item.id === (model ?? models.data?.configured_model),
+  );
+  const effortUnsupported =
+    chat.runtime === "codex" &&
+    reasoningEffort !== null &&
+    !selectedNativeModel?.reasoning_efforts?.some(
+      (item) => item.id === reasoningEffort,
+    );
   const modelMissing =
     nativeModelUnlisted ||
     nativeModelUnverified ||
+    effortUnsupported ||
     (chat.runtime !== "codex" && answerMode === "chat" && model === null);
   const requestNotFound = Boolean(
     recover.error &&
@@ -476,6 +511,9 @@ export function HubConversationView({
       question,
       model_id:
         answerMode === "search" && chat.runtime === "wiki" ? null : model,
+      ...(chat.runtime === "codex"
+        ? { reasoning_effort: reasoningEffort }
+        : {}),
       answer_mode: answerMode,
       knowledge: {
         enabled: chat.runtime === "wiki" || knowledge,
@@ -630,7 +668,9 @@ export function HubConversationView({
               ? "历史模型不在当前目录，请明确选择可用型号或使用本机配置。"
               : nativeModelUnverified
                 ? "所选模型尚未通过目录核验，请查看模型菜单。"
-                : "本轮模型未指定，请在模型菜单明确选择。"}
+                : effortUnsupported
+                  ? "所选思考强度不在此模型的目录中，请明确选择支持的强度或继承原生设置。"
+                  : "本轮模型未指定，请在模型菜单明确选择。"}
           </p>
         )}
         {uncertain && (
@@ -773,9 +813,19 @@ export function HubConversationView({
               onToggle={(event) => setModelMenu(event.currentTarget.open)}
             >
               <summary>
-                {chat.runtime === "codex"
-                  ? (model ?? "本机 Codex 配置")
-                  : (model ?? "选择模型")}
+                <span>
+                  {chat.runtime === "codex"
+                    ? (model ?? "本机 Codex 配置")
+                    : (model ?? "选择模型")}
+                </span>
+                {chat.runtime === "codex" && (
+                  <span>
+                    · 思考{" "}
+                    {reasoningEffort
+                      ? effortLabel(reasoningEffort)
+                      : "继承原生设置"}
+                  </span>
+                )}
                 <ChevronDown size={12} />
               </summary>
               <div className="hub-settings-panel">
@@ -821,6 +871,41 @@ export function HubConversationView({
                       ))}
                   </select>
                 </label>
+                {chat.runtime === "codex" && (
+                  <>
+                    <label>
+                      思考强度
+                      <select
+                        aria-label="思考强度"
+                        value={reasoningEffort ?? ""}
+                        disabled={busy}
+                        onChange={(event) =>
+                          setReasoningEffort(event.target.value || null)
+                        }
+                      >
+                        <option value="">继承原生会话 / 本机配置</option>
+                        {reasoningEffort !== null &&
+                          !selectedNativeModel?.reasoning_efforts?.some(
+                            (item) => item.id === reasoningEffort,
+                          ) && (
+                            <option value={reasoningEffort} disabled>
+                              {effortLabel(reasoningEffort)}（待核验或不支持）
+                            </option>
+                          )}
+                        {selectedNativeModel?.reasoning_efforts?.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {effortLabel(item.id)} · {item.id}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <p>
+                      {selectedNativeModel?.default_reasoning_effort
+                        ? `模型默认：${effortLabel(selectedNativeModel.default_reasoning_effort)}。继承选项沿用原生会话或本机配置，不强行改为模型默认。`
+                        : "打开菜单读取原生支持的思考强度；未指定时沿用原生设置。"}
+                    </p>
+                  </>
+                )}
                 {chat.runtime !== "wiki" && (
                   <button
                     type="button"

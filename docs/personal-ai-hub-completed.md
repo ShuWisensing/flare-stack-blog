@@ -2,6 +2,16 @@
 
 本文记录已经实现、已经形成明确规格，或已经通过源码核验的部分。后续排查时先区分“已接入但可能有 bug”和“尚未实现”。
 
+## 2026-10-27 思考强度与原生 Home 合并
+
+- Codex 模型目录保留支持的强度及默认值，网页可选择并随轮次保存/恢复；提交原生 `effort`，运行摘要记录有效值。不支持的模型/强度组合和非 Codex 的强度输入明确拒绝；继承原生设置不强制套用模型目录默认值。
+- 网页首轮建立或复用原生项目并传 `thread/start.projectId`；项目发现使用原生名称和确切根目录，读取所有 Codex provider 的历史，不混合 opencode 会话。显式 executable 配置避免 Hub 误用 PATH 的旧 CLI；无效路径报错。
+- 原生数据已一致备份到 `D:\AIData\Backups\codex-home-sync-20261027-225125`。恢复 1 份缺失 rollout、1200 个资源文件，72 条项目归属经原生接口修复；缺失聊天经原生恢复重新物化 1 轮/56 条目。C 的 241 个线程、2387 个轮次、43128 个条目在 D 均无缺项。
+- User `CODEX_HOME` 与 Hub 使用 D；C 的 sessions / archived_sessions / .chatgpt-projects 兼容联接到 D，让旧路径指向同一份实际数据。旧目录和备份保留，原生 SQLite 未手工改写、没有发起模型任务。桌面当前 UI 的缓存刷新仍需在任务结束后重启应用核验；3 条缺少线程原文的旧导航引用只保留审计。
+- 2026-10-28 追加修复真实账号检查失败：全局与会话工具覆盖分开，Hub 内置 Apps 单独关闭；原生账号、临时只读会话及 MCP 工具清单回读通过，未发模型任务。启动参数显式空 executable 在 PowerShell 5.1/7 均拒绝，避免误用 PATH。
+- 验证：后端全量 349 项，最后原生协议 38 项及 PowerShell 脚本 33 项回归通过；博客 Node 全量 219 项、Workers、类型、711 文件 lint、生产构建通过。首次并行 Node 运行两条无关 Markdown 测试冷启动超时，串行复核及全量 maxWorkers=1 全绿。1440/390 宽度下强度菜单与选择已用真实目录快照检查，未操作生产聊天。
+- FastAPI / opencode 已重启，本机 Codex 与 opencode 检查 ready，索引 ready；本机及带 token 的 PowerShell 公网 health 200。博客本次部署待 Actions 确认；完整说明见根目录 `doc/blog-and-ai-hub-architecture.md` 的 7、8.1、10 节。
+
 ## 2026-10-27 网页 Codex、目录登记与长期说明
 
 - 长期说明：[博客、Wiki 与本机 Agent 架构及维护](../doc/blog-and-ai-hub-architecture.md)，覆盖整体部署、数据权威、模型、手动/自动知识维护、历史、MCP 与运行排查；已按用户授权写入项目规则，代码变化在同一任务同步说明。
